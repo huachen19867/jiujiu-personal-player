@@ -1,35 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  collectAudioFilesFromDirectory,
   createSongFromNativeAudio,
   createSongsFromFiles,
   isAudioFile,
-  supportsDirectoryImport,
 } from './musicFiles';
-
-class TestFileHandle {
-  kind = 'file' as const;
-
-  constructor(private file: File) {}
-
-  async getFile() {
-    return this.file;
-  }
-}
-
-class TestDirectoryHandle {
-  kind = 'directory' as const;
-
-  constructor(private children: Array<[string, TestFileHandle | TestDirectoryHandle]>) {}
-
-  async *entries() {
-    yield* this.children;
-  }
-}
 
 describe('music file utilities', () => {
   const originalCreateObjectURL = URL.createObjectURL;
-  const originalShowDirectoryPicker = globalThis.showDirectoryPicker;
 
   beforeEach(() => {
     Object.defineProperty(URL, 'createObjectURL', {
@@ -42,10 +19,6 @@ describe('music file utilities', () => {
     Object.defineProperty(URL, 'createObjectURL', {
       configurable: true,
       value: originalCreateObjectURL,
-    });
-    Object.defineProperty(globalThis, 'showDirectoryPicker', {
-      configurable: true,
-      value: originalShowDirectoryPicker,
     });
     vi.restoreAllMocks();
   });
@@ -132,37 +105,5 @@ describe('music file utilities', () => {
     ]);
 
     expect(firstImport[0].id).not.toBe(secondImport[0].id);
-  });
-
-  it('detects whether directory import is available', () => {
-    Object.defineProperty(globalThis, 'showDirectoryPicker', {
-      configurable: true,
-      value: undefined,
-    });
-    expect(supportsDirectoryImport()).toBe(false);
-
-    Object.defineProperty(globalThis, 'showDirectoryPicker', {
-      configurable: true,
-      value: vi.fn(),
-    });
-    expect(supportsDirectoryImport()).toBe(true);
-  });
-
-  it('recursively collects audio files from a directory handle', async () => {
-    const intro = new File(['intro'], 'Intro.m4a', { type: 'audio/mp4' });
-    const notes = new File(['notes'], 'notes.md', { type: 'text/markdown' });
-    const live = new File(['live'], 'Live Set.opus', { type: '' });
-    const directory = new TestDirectoryHandle([
-      ['Intro.m4a', new TestFileHandle(intro)],
-      ['notes.md', new TestFileHandle(notes)],
-      [
-        'sets',
-        new TestDirectoryHandle([['Live Set.opus', new TestFileHandle(live)]]),
-      ],
-    ]);
-
-    const files = await collectAudioFilesFromDirectory(directory);
-
-    expect(files).toEqual([intro, live]);
   });
 });

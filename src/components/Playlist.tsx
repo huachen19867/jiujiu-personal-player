@@ -4,6 +4,7 @@ import type { Song } from '../types/music';
 import { formatBytes, formatDuration } from '../lib/format';
 
 interface PlaylistProps {
+  playlistName: string;
   songs: Song[];
   currentSongId: string | null;
   onPlaySong: (songId: string) => void;
@@ -12,7 +13,7 @@ interface PlaylistProps {
   onClear: () => void;
 }
 
-export function Playlist({ songs, currentSongId, onPlaySong, onRemoveSong, onRemoveSongs, onClear }: PlaylistProps) {
+export function Playlist({ playlistName, songs, currentSongId, onPlaySong, onRemoveSong, onRemoveSongs, onClear }: PlaylistProps) {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedSongIds, setSelectedSongIds] = useState<string[]>([]);
   const selectedCount = selectedSongIds.length;
@@ -77,7 +78,7 @@ export function Playlist({ songs, currentSongId, onPlaySong, onRemoveSong, onRem
       <div className="playlist-heading">
         <div>
           <p>PLAYLIST</p>
-          <h2>{songs.length ? `${songs.length} 首本地歌` : '还没有歌'}</h2>
+          <h2>{playlistName}：{songs.length} 首歌</h2>
         </div>
         <div className="playlist-actions">
           <button type="button" disabled={!songs.length} onClick={toggleSelectionMode}>

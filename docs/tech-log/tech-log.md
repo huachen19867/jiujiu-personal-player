@@ -267,6 +267,18 @@ CSS 色板回到 `#f9fafb` 页面、`#ffffff` 卡片、`#111827/#4b5563/#9ca3af`
 
 本轮把底部 `ProfilePanel` 的占位 ASCII 模块改成正式两层入口：第一层只显示“问题反馈”，保持底部信息轻，不把公众号和二维码直接铺在主界面；点开后第二层显示“微信公众号：陈化AI札记”和二维码。二维码源文件来自用户提供的微信图片，复制为 `public/feedback-qr.jpg`，由 Vite/Capacitor 打包进 APK，避免运行时依赖外部链接。
 
-实现上让 `ProfilePanel` 自己维护展开状态，按钮使用 `aria-label="问题反馈"` 和 `aria-expanded`，可被测试和读屏识别；视觉上仍保留 ASCII 边框语气，但外层用 8px 细边框卡片保证手机端触控面积。新增回归测试覆盖初始不展示公众号、点击“问题反馈”后展示公众号名和二维码图片，避免以后又退回“待填写”占位。
+实现上让 `ProfilePanel` 自己维护展开状态，按钮使用 `aria-label="问题反馈"` 和 `aria-expanded`，可被测试和读屏识别；视觉上用普通产品化按钮和 8px 细边框卡片保证手机端触控面积，避免再把 ASCII 草图留在正式界面。新增回归测试覆盖初始不展示公众号、点击“问题反馈”后展示公众号名和二维码图片，避免以后又退回“待填写”占位。
 
 由于本轮会重新产出手机安装包，同时将 Android `versionCode` 从 2 递增到 3、`versionName` 从 `1.0.1` 递增到 `1.0.2`，并把 `android:copy-apk` 的版本化输出改为 `C:\AI\Android\jiujiu-personal-player-v1.0.2-debug.apk`。后续每次给手机下载的新包都应重复这个动作，否则真机容易继续遇到“下载了新包但不像覆盖升级”的混乱体验。
+
+## 歌单持久化与分组修正
+
+本轮修复真机反馈里的两个产品硬伤。刷新后丢歌的根因是 `useMusicPlayer` 虽然把 Android 原生选择器返回的 `content://` URI 写进本地存储，但启动时仍把 `songs` 初始化为空，只用保存的数量显示“重新授权”提示。现在 `LibraryState` 改为 `playlists + activePlaylistId`，启动时会把带 `nativeUri` 的 Android 歌曲恢复成可播放的 `Song`，旧版扁平歌单会迁移到“歌单一”。没有 `nativeUri` 的旧网页文件记录仍无法跨会话恢复播放，只保留数量提示，边界是浏览器 `File` 授权本身不能长期保存。
+
+手机端“文件夹导入”入口已从界面和代码中移除。它依赖 `showDirectoryPicker`/File System Access API，在 Android WebView 里不可靠；既然用户最终在手机上使用，就不应该继续放一个多数情况下不可用的按钮。稳定主路径保持“选歌，可多选”，Android App 内继续优先走原生 `ACTION_OPEN_DOCUMENT` 多选。
+
+歌单分离按手机端使用方式落地：播放列表标题显示“歌单一：x 首歌”；当前播放区显示“正在播放 歌单一 / 歌名”，并去掉“来自当前本地歌单”的小字。当前播放区可点开切换歌单，列表显示“歌单一：N 首歌”“歌单二：N 首歌”等；当当前歌单选入歌曲后，系统会自动露出下一个空歌单，形成“歌单一有歌后出现歌单二、歌单二有歌后出现歌单三”的轻量分组逻辑。
+
+本轮还把反馈模块从“个人导航”改为正式“问题反馈”，移除 ASCII 草图，只保留产品化入口；点开后显示“微信公众号：陈化AI札记”和 `public/feedback-qr.jpg`。测试覆盖刷新恢复 Android native 歌曲、移除文件夹入口、反馈模块文案、歌单自动追加、歌单选择器和旧存储迁移。发布版本递增到 `versionCode=4`、`versionName=1.0.3`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.3-debug.apk`。
+
+验证结果：`npm test -- --run` 6 个测试文件、37 条用例通过；`npm run build` 通过；`npm audit --audit-level=moderate` 返回 0 vulnerabilities；`npm run android:apk` 成功产出 APK。APK 复查显示包名 `cn.jiujiu.personalplayer`、`versionCode=4`、`versionName=1.0.3`、应用名 `99新自用唱机`，`apksigner` v2 签名验证通过，`zipalign -c -p 4` 通过。包内资源探针确认包含 `feedback-qr.jpg` 和新版“歌单一/问题反馈”字符串，不再包含“个人导航”“文件夹导入暂不可用”或“来自当前本地歌单”。本次 APK SHA256 为 `41679E57DFBD2DF5108C57791DC4E767515949D04D25C9B055EF00588CAD7C93`。

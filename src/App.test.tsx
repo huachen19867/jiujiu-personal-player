@@ -25,10 +25,6 @@ describe('App', () => {
       configurable: true,
       value: vi.fn(),
     });
-    Object.defineProperty(globalThis, 'showDirectoryPicker', {
-      configurable: true,
-      value: undefined,
-    });
     Object.defineProperty(globalThis, 'Capacitor', {
       configurable: true,
       value: undefined,
@@ -46,10 +42,12 @@ describe('App', () => {
 
     expect(screen.getByText('99新自用唱机')).toBeInTheDocument();
     expect(screen.getByLabelText('选歌，可多选')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '文件夹导入暂不可用' })).toBeDisabled();
-    expect(screen.getByRole('navigation', { name: '个人导航' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /文件夹导入/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: '问题反馈' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '问题反馈' })).toBeInTheDocument();
     expect(screen.queryByText('微信公众号：陈化AI札记')).not.toBeInTheDocument();
+    expect(screen.queryByText('个人导航')).not.toBeInTheDocument();
+    expect(screen.queryByText(/\+----------------/)).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: '还没有歌' })).toBeInTheDocument();
   });
 
@@ -66,12 +64,21 @@ describe('App', () => {
     );
   });
 
-  it('shows that a saved playlist needs file reauthorization after refresh', () => {
+  it('restores Android native songs after refresh', async () => {
     localStorage.setItem(
       'jiujiu-personal-player-library-v1',
       JSON.stringify({
-        songs: [{ id: 'stored', name: 'Stored Track', type: 'audio/mpeg', size: 123 }],
-        currentSongId: 'stored',
+        songs: [
+          {
+            id: 'stored-native',
+            name: '白嫁衣',
+            type: 'audio/mpeg',
+            size: 123,
+            source: 'android-native',
+            nativeUri: 'content://media/audio/stored-native',
+          },
+        ],
+        currentSongId: 'stored-native',
         playbackMode: 'sequence',
         volume: 0.85,
       }),
@@ -79,8 +86,9 @@ describe('App', () => {
 
     render(<App />);
 
-    expect(screen.getByText('上次歌单有 1 首，重新选歌授权后才能播放。')).toBeInTheDocument();
-    expect(localStorage.getItem('jiujiu-personal-player-library-v1')).toContain('Stored Track');
+    const playlist = screen.getByRole('list', { name: '播放列表' });
+    expect(await within(playlist).findByText('白嫁衣')).toBeInTheDocument();
+    expect(screen.queryByText(/重新选歌授权/)).not.toBeInTheDocument();
   });
 
   it('adds selected local audio files to the playlist', async () => {
@@ -136,6 +144,58 @@ describe('App', () => {
     const playlist = screen.getByRole('list', { name: '播放列表' });
     expect(await within(playlist).findByText('白嫁衣')).toBeInTheDocument();
     expect(within(playlist).getByText('青花瓷')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '歌单一：2 首歌' })).toBeInTheDocument();
+  });
+
+  it('creates the next playlist after the current playlist receives songs', async () => {
+    const user = userEvent.setup();
+    const pickAudioFiles = vi
+      .fn()
+      .mockResolvedValueOnce({
+        songs: [
+          {
+            id: 'native-one',
+            name: '白嫁衣.mp3',
+            type: 'audio/ffmpeg',
+            size: 4096,
+            uri: 'content://media/audio/1',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        songs: [
+          {
+            id: 'native-two',
+            name: '青花瓷.mp3',
+            type: 'audio/ffmpeg',
+            size: 8192,
+            uri: 'content://media/audio/2',
+          },
+        ],
+      });
+    Object.defineProperty(globalThis, 'Capacitor', {
+      configurable: true,
+      value: {
+        Plugins: {
+          LocalMusicPicker: { pickAudioFiles },
+        },
+      },
+    });
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: '选歌，可多选' }));
+    expect(await screen.findByRole('heading', { name: '歌单一：1 首歌' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '选择播放歌单' }));
+    await user.click(screen.getByRole('button', { name: '歌单二：0 首歌' }));
+    expect(screen.getByRole('heading', { name: '歌单二：0 首歌' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '选歌，可多选' }));
+    expect(await screen.findByRole('heading', { name: '歌单二：1 首歌' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '选择播放歌单' }));
+    expect(screen.getByRole('button', { name: '歌单三：0 首歌' })).toBeInTheDocument();
   });
 
   it('cycles playback mode from the transport controls', async () => {
@@ -169,13 +229,13 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: '播放' }));
 
-    expect(await screen.findByText('正在播放')).toBeInTheDocument();
+    expect(await screen.findByText('正在播放 歌单一')).toBeInTheDocument();
     expect(container.querySelector('.disc-pause-mark')).toBeInTheDocument();
     expect(container.querySelector('.disc-play-mark')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '暂停' }));
 
-    expect(await screen.findByText('已暂停')).toBeInTheDocument();
+    expect(await screen.findByText('已暂停 歌单一')).toBeInTheDocument();
     expect(container.querySelector('.disc-play-mark')).toBeInTheDocument();
     expect(container.querySelector('.disc-pause-mark')).not.toBeInTheDocument();
   });

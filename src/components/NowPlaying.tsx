@@ -1,11 +1,17 @@
-import type { Song } from '../types/music';
+import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import type { PlaylistGroup, Song } from '../types/music';
 import { formatDuration } from '../lib/format';
 
 interface NowPlayingProps {
   song: Song | null;
+  playlistGroups: PlaylistGroup[];
+  activePlaylistId: string;
+  activePlaylistName: string;
   currentTime: number;
   duration: number;
   isPlaying: boolean;
+  onSelectPlaylist: (playlistId: string) => void;
 }
 
 interface PlayerDiscMarkProps {
@@ -58,8 +64,19 @@ function PlayerDiscMark({ isPlaying }: PlayerDiscMarkProps) {
   );
 }
 
-export function NowPlaying({ song, currentTime, duration, isPlaying }: NowPlayingProps) {
+export function NowPlaying({
+  song,
+  playlistGroups,
+  activePlaylistId,
+  activePlaylistName,
+  currentTime,
+  duration,
+  isPlaying,
+  onSelectPlaylist,
+}: NowPlayingProps) {
   const isDiscActive = Boolean(song && isPlaying);
+  const [playlistMenuOpen, setPlaylistMenuOpen] = useState(false);
+  const playbackPrefix = song ? (isPlaying ? '正在播放' : '已暂停') : '还没有开始';
 
   return (
     <section className="now-playing" aria-label="当前播放">
@@ -77,9 +94,38 @@ export function NowPlaying({ song, currentTime, duration, isPlaying }: NowPlayin
         </div>
 
         <div className="track-copy">
-          <p className="track-kicker">{song ? (isPlaying ? '正在播放' : '已暂停') : '还没有开始'}</p>
+          <div className="track-playlist-picker">
+            <button
+              className="playlist-picker-trigger"
+              type="button"
+              aria-label="选择播放歌单"
+              aria-expanded={playlistMenuOpen}
+              onClick={() => setPlaylistMenuOpen((open) => !open)}
+            >
+              <span>
+                {playbackPrefix} {activePlaylistName}
+              </span>
+              <ChevronDown aria-hidden="true" size={16} />
+            </button>
+            {playlistMenuOpen ? (
+              <div className="playlist-picker-menu" role="listbox" aria-label="播放歌单">
+                {playlistGroups.map((playlist) => (
+                  <button
+                    className={playlist.id === activePlaylistId ? 'is-active' : ''}
+                    key={playlist.id}
+                    type="button"
+                    onClick={() => {
+                      onSelectPlaylist(playlist.id);
+                      setPlaylistMenuOpen(false);
+                    }}
+                  >
+                    {playlist.name}：{playlist.songs.length} 首歌
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <h1>{song?.name ?? '还没有歌'}</h1>
-          <p>{song ? '来自当前本地歌单' : '从本地选几首歌'}</p>
         </div>
       </div>
     </section>

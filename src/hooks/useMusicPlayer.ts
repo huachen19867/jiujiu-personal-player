@@ -1,32 +1,53 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getNativeAudioPlayer } from '../lib/nativeBridge';
 import { getNextIndex, getPreviousIndex } from '../lib/playbackQueue';
-import { loadLibraryState, saveLibraryState } from '../lib/storage';
-import type { PlaybackMode, Song } from '../types/music';
+import { DEFAULT_PLAYLIST_ID, DEFAULT_PLAYLIST_NAME, loadLibraryState, saveLibraryState } from '../lib/storage';
+import type { PlaybackMode, PlaylistGroup, Song, StoredPlaylistGroup, StoredSong } from '../types/music';
 
 const MODE_ORDER: PlaybackMode[] = ['sequence', 'repeat-all', 'repeat-one', 'shuffle'];
+const PLAYLIST_NUMERALS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+
+type RestoredLibrary = {
+  playlists: PlaylistGroup[];
+  activePlaylistId: string;
+  currentIndex: number | null;
+  unrestorableSongCount: number;
+};
 
 export function useMusicPlayer() {
   const savedState = useMemo(() => loadLibraryState(), []);
+  const restoredLibrary = useMemo(() => restoreLibrary(savedState.playlists, savedState.activePlaylistId, savedState.currentSongId), [savedState]);
   const nativeAudioPlayer = useMemo(() => getNativeAudioPlayer(), []);
   const [audio] = useState(() => new Audio());
-  const [songs, setSongs] = useState<Song[]>([]);
-  const [currentIndex, setCurrentIndex] = useState<number | null>(null);
+  const [playlistGroups, setPlaylistGroups] = useState<PlaylistGroup[]>(restoredLibrary.playlists);
+  const [activePlaylistId, setActivePlaylistId] = useState(restoredLibrary.activePlaylistId);
+  const [currentIndex, setCurrentIndex] = useState<number | null>(restoredLibrary.currentIndex);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(savedState.volume);
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>(savedState.playbackMode);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const playlistGroupsRef = useRef<PlaylistGroup[]>(restoredLibrary.playlists);
   const songsRef = useRef<Song[]>([]);
   const currentSongRef = useRef<Song | null>(null);
   const volumeRef = useRef(savedState.volume);
   const playlistChangedInSessionRef = useRef(false);
   const playSelectedSongRef = useRef(false);
 
+  const activePlaylist = useMemo(
+    () => playlistGroups.find((playlist) => playlist.id === activePlaylistId) ?? playlistGroups[0],
+    [activePlaylistId, playlistGroups],
+  );
+  const songs = activePlaylist?.songs ?? [];
   const currentSong = currentIndex === null ? null : songs[currentIndex] ?? null;
+  const totalSongCount = playlistGroups.reduce((sum, playlist) => sum + playlist.songs.length, 0);
   const rememberedSongCount =
-    songs.length === 0 && !playlistChangedInSessionRef.current ? savedState.songs.length : 0;
+    totalSongCount === 0 && !playlistChangedInSessionRef.current ? restoredLibrary.unrestorableSongCount : 0;
+
+  useEffect(() => {
+    playlistGroupsRef.current = playlistGroups;
+  }, [playlistGroups]);
 
   useEffect(() => {
     songsRef.current = songs;
@@ -93,12 +114,15 @@ export function useMusicPlayer() {
     setErrorMessage(null);
 
     if (shouldPlay) {
-      void audio.play().then(() => {
-        setIsPlaying(true);
-      }).catch(() => {
-        setIsPlaying(false);
-        setErrorMessage('这首歌暂时播放不了，可能是格式或编码不受当前手机支持。');
-      });
+      void audio
+        .play()
+        .then(() => {
+          setIsPlaying(true);
+        })
+        .catch(() => {
+          setIsPlaying(false);
+          setErrorMessage('这首歌暂时播放不了，可能是格式或编码不受当前手机支持。');
+        });
     }
   }, [audio, currentSong, nativeAudioPlayer]);
 
@@ -144,7 +168,7 @@ export function useMusicPlayer() {
         return;
       }
       setIsPlaying(false);
-      setErrorMessage('这首歌暂时播放不了');
+      setErrorMessage('这首歌暂时播放不了。');
     };
 
     audio.addEventListener('timeupdate', updateTime);
@@ -161,16 +185,28 @@ export function useMusicPlayer() {
   }, [audio, next]);
 
   useEffect(() => {
-    const shouldKeepSavedSongs =
-      !playlistChangedInSessionRef.current && songs.length === 0 && savedState.songs.length > 0;
+    const shouldKeepUnrestorableSavedState =
+      !playlistChangedInSessionRef.current && totalSongCount === 0 && restoredLibrary.unrestorableSongCount > 0;
 
     saveLibraryState({
-      songs: shouldKeepSavedSongs ? savedState.songs : songs,
-      currentSongId: shouldKeepSavedSongs ? savedState.currentSongId : currentSong?.id ?? null,
+      playlists: shouldKeepUnrestorableSavedState ? savedState.playlists : playlistGroups,
+      activePlaylistId: shouldKeepUnrestorableSavedState ? savedState.activePlaylistId : activePlaylistId,
+      currentSongId: shouldKeepUnrestorableSavedState ? savedState.currentSongId : currentSong?.id ?? null,
       playbackMode,
       volume,
     });
-  }, [currentSong?.id, playbackMode, savedState.currentSongId, savedState.songs, songs, volume]);
+  }, [
+    activePlaylistId,
+    currentSong?.id,
+    playbackMode,
+    playlistGroups,
+    restoredLibrary.unrestorableSongCount,
+    savedState.activePlaylistId,
+    savedState.currentSongId,
+    savedState.playlists,
+    totalSongCount,
+    volume,
+  ]);
 
   useEffect(() => {
     if (!currentSong?.nativeUri || !nativeAudioPlayer || !isPlaying) {
@@ -210,7 +246,8 @@ export function useMusicPlayer() {
     return () => {
       audio.pause();
       void nativeAudioPlayer?.release?.();
-      songsRef.current
+      playlistGroupsRef.current
+        .flatMap((playlist) => playlist.songs)
         .filter((song) => song.source !== 'android-native')
         .forEach((song) => URL.revokeObjectURL(song.url));
     };
@@ -223,15 +260,21 @@ export function useMusicPlayer() {
       }
 
       playlistChangedInSessionRef.current = true;
-      setSongs((existingSongs) => {
-        const mergedSongs = [...existingSongs, ...incomingSongs];
-        if (currentIndex === null && existingSongs.length === 0) {
-          setCurrentIndex(0);
-        }
-        return mergedSongs;
-      });
+      const shouldSelectFirstIncoming = currentIndex === null && songs.length === 0;
+      setPlaylistGroups((existingGroups) =>
+        ensureTrailingEmptyPlaylist(
+          existingGroups.map((playlist) =>
+            playlist.id === activePlaylistId
+              ? { ...playlist, songs: [...playlist.songs, ...incomingSongs] }
+              : playlist,
+          ),
+        ),
+      );
+      if (shouldSelectFirstIncoming) {
+        setCurrentIndex(0);
+      }
     },
-    [currentIndex],
+    [activePlaylistId, currentIndex, songs.length],
   );
 
   const play = useCallback(async () => {
@@ -283,6 +326,23 @@ export function useMusicPlayer() {
     [currentIndex, isPlaying, play, songs],
   );
 
+  const selectPlaylist = useCallback(
+    (playlistId: string) => {
+      const playlist = playlistGroups.find((group) => group.id === playlistId);
+      if (!playlist || playlist.id === activePlaylistId) {
+        return;
+      }
+
+      pause();
+      setActivePlaylistId(playlist.id);
+      setCurrentIndex(playlist.songs.length ? 0 : null);
+      setCurrentTime(0);
+      setDuration(0);
+      setErrorMessage(null);
+    },
+    [activePlaylistId, pause, playlistGroups],
+  );
+
   const seek = useCallback(
     (time: number) => {
       const safeTime = Math.max(0, Math.min(time, duration || time));
@@ -317,7 +377,13 @@ export function useMusicPlayer() {
         .filter((song) => song.source !== 'android-native')
         .forEach((song) => URL.revokeObjectURL(song.url));
       const nextSongs = songs.filter((song) => !idsToRemove.has(song.id));
-      setSongs(nextSongs);
+      setPlaylistGroups((existingGroups) =>
+        ensureTrailingEmptyPlaylist(
+          existingGroups.map((playlist) =>
+            playlist.id === activePlaylistId ? { ...playlist, songs: nextSongs } : playlist,
+          ),
+        ),
+      );
 
       if (nextSongs.length === 0) {
         setCurrentIndex(null);
@@ -344,7 +410,7 @@ export function useMusicPlayer() {
 
       setCurrentIndex(replacement ? nextSongs.findIndex((song) => song.id === replacement.id) : null);
     },
-    [currentIndex, pause, songs],
+    [activePlaylistId, currentIndex, pause, songs],
   );
 
   const removeSong = useCallback(
@@ -359,15 +425,24 @@ export function useMusicPlayer() {
     songs
       .filter((song) => song.source !== 'android-native')
       .forEach((song) => URL.revokeObjectURL(song.url));
-    setSongs([]);
+    setPlaylistGroups((existingGroups) =>
+      ensureTrailingEmptyPlaylist(
+        existingGroups.map((playlist) => (playlist.id === activePlaylistId ? { ...playlist, songs: [] } : playlist)),
+      ),
+    );
     setCurrentIndex(null);
     pause();
-  }, [pause, songs]);
+  }, [activePlaylistId, pause, songs]);
 
   return {
     songs,
+    playlistGroups,
+    activePlaylistId,
+    activePlaylistName: activePlaylist?.name ?? DEFAULT_PLAYLIST_NAME,
+    activePlaylist,
     currentSong,
     currentIndex,
+    totalSongCount,
     isPlaying,
     currentTime,
     duration,
@@ -380,6 +455,7 @@ export function useMusicPlayer() {
     pause,
     togglePlay,
     playSong,
+    selectPlaylist,
     next,
     previous,
     seek,
@@ -390,4 +466,84 @@ export function useMusicPlayer() {
     removeSongs,
     clearPlaylist,
   };
+}
+
+function restoreLibrary(
+  storedPlaylists: StoredPlaylistGroup[],
+  storedActivePlaylistId: string,
+  storedCurrentSongId: string | null,
+): RestoredLibrary {
+  let unrestorableSongCount = 0;
+  const restoredPlaylists = storedPlaylists.map((playlist, index) => {
+    const restoredSongs = playlist.songs.map(restoreStoredSong).filter((song): song is Song => Boolean(song));
+    unrestorableSongCount += playlist.songs.length - restoredSongs.length;
+
+    return {
+      id: playlist.id || createPlaylistId(index),
+      name: playlist.name || createPlaylistName(index),
+      songs: restoredSongs,
+    };
+  });
+
+  const playlists = ensureTrailingEmptyPlaylist(restoredPlaylists);
+  const activePlaylist = playlists.find((playlist) => playlist.id === storedActivePlaylistId) ?? playlists[0];
+  const savedSongIndex = activePlaylist.songs.findIndex((song) => song.id === storedCurrentSongId);
+  const currentIndex = savedSongIndex >= 0 ? savedSongIndex : activePlaylist.songs.length ? 0 : null;
+
+  return {
+    playlists,
+    activePlaylistId: activePlaylist.id,
+    currentIndex,
+    unrestorableSongCount,
+  };
+}
+
+function restoreStoredSong(song: StoredSong): Song | null {
+  if (!song.nativeUri) {
+    return null;
+  }
+
+  return {
+    id: song.id,
+    name: song.name,
+    type: song.type,
+    size: song.size,
+    url: song.nativeUri,
+    source: 'android-native',
+    nativeUri: song.nativeUri,
+    artist: song.artist,
+    album: song.album,
+    duration: song.duration,
+  };
+}
+
+function ensureTrailingEmptyPlaylist(playlists: PlaylistGroup[]): PlaylistGroup[] {
+  const normalized = playlists.length ? playlists : [createEmptyPlaylist(0)];
+  const lastFilledIndex = normalized.reduce((lastIndex, playlist, index) => (playlist.songs.length ? index : lastIndex), -1);
+  const visibleCount = Math.max(1, lastFilledIndex + 2);
+
+  return Array.from({ length: visibleCount }, (_, index) => {
+    const playlist = normalized[index] ?? createEmptyPlaylist(index);
+    return {
+      ...playlist,
+      id: playlist.id || createPlaylistId(index),
+      name: createPlaylistName(index),
+    };
+  });
+}
+
+function createEmptyPlaylist(index: number): PlaylistGroup {
+  return {
+    id: index === 0 ? DEFAULT_PLAYLIST_ID : createPlaylistId(index),
+    name: index === 0 ? DEFAULT_PLAYLIST_NAME : createPlaylistName(index),
+    songs: [],
+  };
+}
+
+function createPlaylistId(index: number) {
+  return `playlist-${index + 1}`;
+}
+
+function createPlaylistName(index: number) {
+  return `歌单${PLAYLIST_NUMERALS[index] ?? index + 1}`;
 }

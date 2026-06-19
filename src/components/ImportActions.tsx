@@ -1,21 +1,17 @@
-import { FolderDown, ListMusic } from 'lucide-react';
+import { ListMusic } from 'lucide-react';
 
 interface ImportActionsProps {
   notice: string | null;
-  directoryImportSupported: boolean;
   nativeAudioImportSupported: boolean;
   onFilesSelected: (files: FileList | File[]) => void;
   onNativeAudioImport: () => void;
-  onImportDirectory: () => void;
 }
 
 export function ImportActions({
   notice,
-  directoryImportSupported,
   nativeAudioImportSupported,
   onFilesSelected,
   onNativeAudioImport,
-  onImportDirectory,
 }: ImportActionsProps) {
   return (
     <section className="import-panel" aria-label="本地导入">
@@ -42,16 +38,6 @@ export function ImportActions({
           />
         </label>
       )}
-
-      <button
-        className="import-button"
-        type="button"
-        disabled={!directoryImportSupported}
-        onClick={onImportDirectory}
-      >
-        <FolderDown aria-hidden="true" size={20} />
-        <span>{directoryImportSupported ? '导入文件夹' : '文件夹导入暂不可用'}</span>
-      </button>
 
       {notice ? (
         <p className="notice" role="status">

@@ -7,26 +7,18 @@ import { TransportControls } from './components/TransportControls';
 import { APP_BRAND } from './config/brand';
 import { useMusicPlayer } from './hooks/useMusicPlayer';
 import {
-  collectAudioFilesFromDirectory,
   createSongFromNativeAudio,
   createSongsFromFiles,
-  type DirectoryHandleLike,
-  supportsDirectoryImport,
 } from './lib/musicFiles';
 import { getNativeMusicPicker } from './lib/nativeBridge';
 import './styles.css';
 
-type DirectoryPickerGlobal = typeof globalThis & {
-  showDirectoryPicker?: () => Promise<DirectoryHandleLike>;
-};
-
 function App() {
   const player = useMusicPlayer();
   const [notice, setNotice] = useState<string | null>(null);
-  const directoryImportSupported = supportsDirectoryImport();
   const nativeAudioImportSupported = Boolean(getNativeMusicPicker());
   const reauthorizationNotice = player.rememberedSongCount
-    ? `上次歌单有 ${player.rememberedSongCount} 首，重新选歌授权后才能播放。`
+    ? `上次有 ${player.rememberedSongCount} 首旧版歌曲需要重新选一次；新版导入后会自动保留。`
     : null;
 
   const addFiles = (files: FileList | File[]) => {
@@ -61,28 +53,6 @@ function App() {
     }
   };
 
-  const importDirectory = async () => {
-    if (!supportsDirectoryImport()) {
-      setNotice('当前浏览器不支持文件夹导入，请改用选歌多选。');
-      return;
-    }
-
-    try {
-      const picker = (globalThis as DirectoryPickerGlobal).showDirectoryPicker;
-      const handle = await picker?.();
-      if (!handle) {
-        return;
-      }
-
-      const files = await collectAudioFilesFromDirectory(handle);
-      addFiles(files);
-    } catch (error) {
-      if ((error as DOMException).name !== 'AbortError') {
-        setNotice('文件夹导入失败，请改用选歌多选。');
-      }
-    }
-  };
-
   return (
     <main className="app-shell">
       <div className="player-page">
@@ -91,25 +61,27 @@ function App() {
             <p className="site-kicker">LOCAL PLAYER</p>
             <div className="site-title">{APP_BRAND.displayName}</div>
           </div>
-          <p className="site-status">{player.songs.length ? `${player.songs.length} 首歌` : '本地歌单'}</p>
+          <p className="site-status">{player.totalSongCount ? `${player.totalSongCount} 首歌` : '本地歌单'}</p>
         </header>
 
         <div className="player-layout">
           <div className="player-primary">
             <NowPlaying
               song={player.currentSong}
+              playlistGroups={player.playlistGroups}
+              activePlaylistId={player.activePlaylistId}
+              activePlaylistName={player.activePlaylistName}
               currentTime={player.currentTime}
               duration={player.duration}
               isPlaying={player.isPlaying}
+              onSelectPlaylist={player.selectPlaylist}
             />
 
             <ImportActions
               notice={notice ?? player.errorMessage ?? reauthorizationNotice}
-              directoryImportSupported={directoryImportSupported}
               nativeAudioImportSupported={nativeAudioImportSupported}
               onFilesSelected={addFiles}
               onNativeAudioImport={importNativeAudio}
-              onImportDirectory={importDirectory}
             />
 
             <TransportControls
@@ -130,6 +102,7 @@ function App() {
 
           <div className="player-secondary">
             <Playlist
+              playlistName={player.activePlaylistName}
               songs={player.songs}
               currentSongId={player.currentSong?.id ?? null}
               onPlaySong={player.playSong}

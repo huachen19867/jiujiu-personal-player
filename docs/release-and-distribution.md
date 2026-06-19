@@ -25,7 +25,7 @@ cn.jiujiu.personalplayer
 
 ```text
 C:\AI\Android\jiujiu-personal-player-debug.apk
-C:\AI\Android\jiujiu-personal-player-v1.0.2-debug.apk
+C:\AI\Android\jiujiu-personal-player-v1.0.3-debug.apk
 ```
 
 本地生成命令：
@@ -36,7 +36,7 @@ npm run android:apk
 
 注意：当前是 debug 签名包，适合发给自己或朋友测试。真正上架应用商店时，需要做 release 签名，并且长期保存签名文件；签名丢了，以后就没法给同一个应用正常升级。
 
-Android 覆盖升级依赖同一个包名、同一套签名，并且建议递增 `versionCode`。`1.0.0` 的测试包使用 `versionCode=1`；`1.0.1` 升到 `versionCode=2`；`1.0.2` 升到 `versionCode=3`。如果手机浏览器缓存了旧 APK，优先下载带版本号的文件名。
+Android 覆盖升级依赖同一个包名、同一套签名，并且建议递增 `versionCode`。`1.0.0` 的测试包使用 `versionCode=1`；`1.0.1` 升到 `versionCode=2`；`1.0.2` 升到 `versionCode=3`；`1.0.3` 升到 `versionCode=4`。如果手机浏览器缓存了旧 APK，优先下载带版本号的文件名。
 
 ## 热更新判断
 
@@ -72,9 +72,9 @@ Android 覆盖升级依赖同一个包名、同一套签名，并且建议递增
 
 ## 手机文件导入边界
 
-“选歌，可多选”是手机端主入口。Android App 内不再完全依赖 WebView 文件输入，而是优先调用原生 `ACTION_OPEN_DOCUMENT`，并显式设置 `EXTRA_ALLOW_MULTIPLE`。桌面网页和非原生环境才回退到普通 `<input type="file" multiple>`。
+“选歌，可多选”是手机端唯一导入入口。Android App 内不再完全依赖 WebView 文件输入，而是优先调用原生 `ACTION_OPEN_DOCUMENT`，并显式设置 `EXTRA_ALLOW_MULTIPLE`。桌面网页和非原生环境才回退到普通 `<input type="file" multiple>`。
 
-“导入文件夹”依赖网页的 File System Access API，比如 `showDirectoryPicker`。这个能力在桌面 Chrome 更常见，在手机浏览器和 Android WebView 中经常不可用。所以项目里需要先检测能力，不支持时禁用按钮并提示“文件夹导入暂不可用”。
+“导入文件夹”已经从产品入口移除。它依赖网页的 File System Access API，比如 `showDirectoryPicker`，这个能力在手机浏览器和 Android WebView 中经常不可用；既然最终场景是手机端，就不应该把一个不可依赖的入口留给用户误点。
 
 如果以后要做真正的“扫描手机音乐文件夹”，就不能继续只靠网页 API，需要接 Android 原生 MediaStore 或文件权限插件；iOS 也会受系统沙盒限制，通常只能让用户从 Files 中显式选择文件。
 

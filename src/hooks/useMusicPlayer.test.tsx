@@ -100,6 +100,42 @@ describe('useMusicPlayer', () => {
     expect(localStorage.getItem('jiujiu-personal-player-library-v1')).toContain('Stored Track');
   });
 
+  it('restores saved Android native songs with persisted content URIs', () => {
+    localStorage.setItem(
+      'jiujiu-personal-player-library-v1',
+      JSON.stringify({
+        songs: [
+          {
+            id: 'native-stored',
+            name: 'Stored Native Track',
+            type: 'audio/mpeg',
+            size: 123,
+            source: 'android-native',
+            nativeUri: 'content://media/audio/native-stored',
+          },
+        ],
+        currentSongId: 'native-stored',
+        playbackMode: 'shuffle',
+        volume: 0.6,
+      }),
+    );
+
+    const { result } = renderHook(() => useMusicPlayer());
+
+    expect(result.current.songs).toHaveLength(1);
+    expect(result.current.songs[0]).toMatchObject({
+      id: 'native-stored',
+      name: 'Stored Native Track',
+      url: 'content://media/audio/native-stored',
+      nativeUri: 'content://media/audio/native-stored',
+      source: 'android-native',
+    });
+    expect(result.current.currentSong?.id).toBe('native-stored');
+    expect(result.current.rememberedSongCount).toBe(0);
+    expect(result.current.playbackMode).toBe('shuffle');
+    expect(result.current.volume).toBe(0.6);
+  });
+
   it('toggles play and pause through the audio element', async () => {
     const { result } = renderHook(() => useMusicPlayer());
     act(() => result.current.addSongs([makeSong('one')]));

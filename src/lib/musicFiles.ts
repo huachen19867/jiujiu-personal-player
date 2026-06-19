@@ -12,16 +12,6 @@ const EXTENSION_MIME_TYPES = new Map([
 ]);
 let fallbackIdSequence = 0;
 
-type FileHandleLike = {
-  kind: 'file';
-  getFile: () => Promise<File>;
-};
-
-export type DirectoryHandleLike = {
-  kind: 'directory';
-  entries: () => AsyncIterable<[string, FileHandleLike | DirectoryHandleLike]>;
-};
-
 export interface NativeAudioAsset {
   id?: string;
   name: string;
@@ -74,28 +64,6 @@ export function createSongFromNativeAudio(asset: NativeAudioAsset, index = 0): S
     source: 'android-native',
     duration: asset.duration,
   };
-}
-
-export function supportsDirectoryImport() {
-  return typeof (globalThis as { showDirectoryPicker?: unknown }).showDirectoryPicker === 'function';
-}
-
-export async function collectAudioFilesFromDirectory(handle: DirectoryHandleLike): Promise<File[]> {
-  const files: File[] = [];
-
-  for await (const [, child] of handle.entries()) {
-    if (child.kind === 'file') {
-      const file = await child.getFile();
-      if (isAudioFile(file)) {
-        files.push(file);
-      }
-      continue;
-    }
-
-    files.push(...(await collectAudioFilesFromDirectory(child)));
-  }
-
-  return files;
 }
 
 function getExtension(name: string) {

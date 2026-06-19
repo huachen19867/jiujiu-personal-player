@@ -22,7 +22,8 @@ describe('library storage', () => {
 
   it('saves serializable song metadata and playback preferences', () => {
     saveLibraryState({
-      songs: [makeSong({ duration: 182 })],
+      playlists: [{ id: 'playlist-1', name: '歌单一', songs: [makeSong({ duration: 182 })] }],
+      activePlaylistId: 'playlist-1',
       currentSongId: 'song-1',
       playbackMode: 'shuffle',
       volume: 0.42,
@@ -31,11 +32,33 @@ describe('library storage', () => {
     const raw = localStorage.getItem('jiujiu-personal-player-library-v1');
 
     expect(raw).toContain('"name":"Track"');
+    expect(raw).toContain('"playlists"');
     expect(raw).toContain('"playbackMode":"shuffle"');
     expect(raw).not.toContain('blob:track');
   });
 
-  it('loads a valid saved state', () => {
+  it('loads a valid saved playlist state', () => {
+    localStorage.setItem(
+      'jiujiu-personal-player-library-v1',
+      JSON.stringify({
+        playlists: [{ id: 'playlist-1', name: '歌单一', songs: [{ id: 'song-1', name: 'Track', type: 'audio/mpeg', size: 5 }] }],
+        activePlaylistId: 'playlist-1',
+        currentSongId: 'song-1',
+        playbackMode: 'repeat-all',
+        volume: 0.8,
+      }),
+    );
+
+    expect(loadLibraryState()).toEqual({
+      playlists: [{ id: 'playlist-1', name: '歌单一', songs: [{ id: 'song-1', name: 'Track', type: 'audio/mpeg', size: 5 }] }],
+      activePlaylistId: 'playlist-1',
+      currentSongId: 'song-1',
+      playbackMode: 'repeat-all',
+      volume: 0.8,
+    });
+  });
+
+  it('migrates a legacy flat song list into the first playlist', () => {
     localStorage.setItem(
       'jiujiu-personal-player-library-v1',
       JSON.stringify({
@@ -46,11 +69,10 @@ describe('library storage', () => {
       }),
     );
 
-    expect(loadLibraryState()).toEqual({
-      songs: [{ id: 'song-1', name: 'Track', type: 'audio/mpeg', size: 5 }],
+    expect(loadLibraryState()).toMatchObject({
+      playlists: [{ id: 'playlist-1', name: '歌单一', songs: [{ id: 'song-1', name: 'Track' }] }],
+      activePlaylistId: 'playlist-1',
       currentSongId: 'song-1',
-      playbackMode: 'repeat-all',
-      volume: 0.8,
     });
   });
 

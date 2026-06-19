@@ -27,8 +27,21 @@ export interface StoredSong {
   duration?: number;
 }
 
-export interface LibraryState {
+export interface PlaylistGroup {
+  id: string;
+  name: string;
+  songs: Song[];
+}
+
+export interface StoredPlaylistGroup {
+  id: string;
+  name: string;
   songs: StoredSong[];
+}
+
+export interface LibraryState {
+  playlists: StoredPlaylistGroup[];
+  activePlaylistId: string;
   currentSongId: string | null;
   playbackMode: PlaybackMode;
   volume: number;
