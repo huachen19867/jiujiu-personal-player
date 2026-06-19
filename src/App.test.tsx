@@ -29,6 +29,10 @@ describe('App', () => {
       configurable: true,
       value: undefined,
     });
+    Object.defineProperty(globalThis, 'Capacitor', {
+      configurable: true,
+      value: undefined,
+    });
     localStorage.clear();
   });
 
@@ -41,8 +45,10 @@ describe('App', () => {
     render(<App />);
 
     expect(screen.getByText('99新自用唱机')).toBeInTheDocument();
-    expect(screen.getByLabelText('选歌')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '导入文件夹' })).toBeInTheDocument();
+    expect(screen.getByLabelText('选歌，可多选')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '文件夹导入暂不可用' })).toBeDisabled();
+    expect(screen.getByRole('navigation', { name: '个人导航' })).toBeInTheDocument();
+    expect(screen.getByText('公众号：待填写')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: '还没有歌' })).toBeInTheDocument();
   });
 
@@ -67,7 +73,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.upload(screen.getByLabelText('选歌'), [
+    await user.upload(screen.getByLabelText('选歌，可多选'), [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
       new File(['text'], 'notes.txt', { type: 'text/plain' }),
       new File(['audio'], 'Late Night.flac', { type: '' }),
@@ -79,11 +85,50 @@ describe('App', () => {
     expect(within(playlist).queryByText('notes')).not.toBeInTheDocument();
   });
 
+  it('uses the Android native multi picker when it is available', async () => {
+    const user = userEvent.setup();
+    const pickAudioFiles = vi.fn().mockResolvedValue({
+      songs: [
+        {
+          id: 'native-one',
+          name: '白嫁衣.mp3',
+          type: 'audio/ffmpeg',
+          size: 4096,
+          uri: 'content://media/audio/1',
+        },
+        {
+          id: 'native-two',
+          name: '青花瓷.mp3',
+          type: 'audio/ffmpeg',
+          size: 8192,
+          uri: 'content://media/audio/2',
+        },
+      ],
+    });
+    Object.defineProperty(globalThis, 'Capacitor', {
+      configurable: true,
+      value: {
+        Plugins: {
+          LocalMusicPicker: { pickAudioFiles },
+        },
+      },
+    });
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: '选歌，可多选' }));
+
+    expect(pickAudioFiles).toHaveBeenCalled();
+    const playlist = screen.getByRole('list', { name: '播放列表' });
+    expect(await within(playlist).findByText('白嫁衣')).toBeInTheDocument();
+    expect(within(playlist).getByText('青花瓷')).toBeInTheDocument();
+  });
+
   it('cycles playback mode from the transport controls', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.upload(screen.getByLabelText('选歌'), [
+    await user.upload(screen.getByLabelText('选歌，可多选'), [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
     ]);
 
@@ -93,11 +138,40 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: '播放模式：列表循环' })).toBeInTheDocument();
   });
 
-  it('removes a track from the playlist', async () => {
+  it('switches the album center mark only while playback is active', async () => {
     const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    expect(container.querySelector('.disc-play-mark')).toBeInTheDocument();
+    expect(container.querySelector('.disc-pause-mark')).not.toBeInTheDocument();
+
+    await user.upload(screen.getByLabelText('选歌，可多选'), [
+      new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
+    ]);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Blue Monday' })).toBeInTheDocument();
+    expect(container.querySelector('.disc-play-mark')).toBeInTheDocument();
+    expect(container.querySelector('.disc-pause-mark')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '播放' }));
+
+    expect(await screen.findByText('正在播放')).toBeInTheDocument();
+    expect(container.querySelector('.disc-pause-mark')).toBeInTheDocument();
+    expect(container.querySelector('.disc-play-mark')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '暂停' }));
+
+    expect(await screen.findByText('已暂停')).toBeInTheDocument();
+    expect(container.querySelector('.disc-play-mark')).toBeInTheDocument();
+    expect(container.querySelector('.disc-pause-mark')).not.toBeInTheDocument();
+  });
+
+  it('asks for confirmation before removing a track from the playlist', async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<App />);
 
-    await user.upload(screen.getByLabelText('选歌'), [
+    await user.upload(screen.getByLabelText('选歌，可多选'), [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
       new File(['audio'], 'Late Night.flac', { type: '' }),
     ]);
@@ -105,16 +179,55 @@ describe('App', () => {
     const playlist = screen.getByRole('list', { name: '播放列表' });
     await user.click(within(playlist).getByRole('button', { name: '移除 Blue Monday' }));
 
+    expect(confirm).toHaveBeenCalledWith('确定要删除「Blue Monday」吗？');
+    expect(within(playlist).getByText('Blue Monday')).toBeInTheDocument();
+
+    confirm.mockReturnValue(true);
+    await user.click(within(playlist).getByRole('button', { name: '移除 Blue Monday' }));
+
     expect(within(playlist).queryByText('Blue Monday')).not.toBeInTheDocument();
     expect(within(playlist).getByText('Late Night')).toBeInTheDocument();
   });
 
-  it('shows a fallback message when folder import is unsupported', async () => {
+  it('removes selected tracks after confirmation', async () => {
     const user = userEvent.setup();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: '导入文件夹' }));
+    await user.upload(screen.getByLabelText('选歌，可多选'), [
+      new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
+      new File(['audio'], 'Late Night.flac', { type: '' }),
+      new File(['audio'], 'Third Song.wav', { type: 'audio/wav' }),
+    ]);
 
-    expect(screen.getByText('当前浏览器不支持文件夹导入，请改用选歌多选。')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '多选' }));
+    await user.click(screen.getByRole('checkbox', { name: '选择 Blue Monday' }));
+    await user.click(screen.getByRole('checkbox', { name: '选择 Late Night' }));
+    await user.click(screen.getByRole('button', { name: '删除所选 2 首' }));
+
+    expect(confirm).toHaveBeenCalledWith('确定要删除选中的 2 首歌吗？');
+    const playlist = screen.getByRole('list', { name: '播放列表' });
+    expect(within(playlist).queryByText('Blue Monday')).not.toBeInTheDocument();
+    expect(within(playlist).queryByText('Late Night')).not.toBeInTheDocument();
+    expect(within(playlist).getByText('Third Song')).toBeInTheDocument();
+  });
+
+  it('keeps selected tracks when batch deletion is canceled', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<App />);
+
+    await user.upload(screen.getByLabelText('选歌，可多选'), [
+      new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
+      new File(['audio'], 'Late Night.flac', { type: '' }),
+    ]);
+
+    await user.click(screen.getByRole('button', { name: '多选' }));
+    await user.click(screen.getByRole('checkbox', { name: '选择 Blue Monday' }));
+    await user.click(screen.getByRole('button', { name: '删除所选 1 首' }));
+
+    const playlist = screen.getByRole('list', { name: '播放列表' });
+    expect(within(playlist).getByText('Blue Monday')).toBeInTheDocument();
+    expect(within(playlist).getByText('Late Night')).toBeInTheDocument();
   });
 });

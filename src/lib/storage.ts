@@ -47,6 +47,8 @@ function toStoredSong(song: Song | StoredSong): StoredSong {
     name: song.name,
     type: song.type,
     size: song.size,
+    source: song.source,
+    nativeUri: song.nativeUri,
     artist: song.artist,
     album: song.album,
     duration: song.duration,
@@ -80,6 +82,8 @@ function isStoredSong(value: unknown): value is StoredSong {
     typeof candidate.id === 'string' &&
     typeof candidate.name === 'string' &&
     typeof candidate.type === 'string' &&
-    typeof candidate.size === 'number'
+    typeof candidate.size === 'number' &&
+    (candidate.source === undefined || candidate.source === 'web-file' || candidate.source === 'android-native') &&
+    (candidate.nativeUri === undefined || typeof candidate.nativeUri === 'string')
   );
 }

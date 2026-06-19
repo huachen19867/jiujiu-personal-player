@@ -1,4 +1,5 @@
 export type PlaybackMode = 'sequence' | 'repeat-one' | 'repeat-all' | 'shuffle';
+export type SongSource = 'web-file' | 'android-native';
 
 export interface Song {
   id: string;
@@ -6,7 +7,9 @@ export interface Song {
   type: string;
   size: number;
   url: string;
-  file: File;
+  file?: File;
+  source?: SongSource;
+  nativeUri?: string;
   artist?: string;
   album?: string;
   duration?: number;
@@ -17,6 +20,8 @@ export interface StoredSong {
   name: string;
   type: string;
   size: number;
+  source?: SongSource;
+  nativeUri?: string;
   artist?: string;
   album?: string;
   duration?: number;

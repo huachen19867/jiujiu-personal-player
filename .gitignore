@@ -6,6 +6,7 @@ dist/
 
 # Local dev server logs
 .vite-dev*.log
+.lark-auth*.log
 *.local.log
 
 # Test and coverage output

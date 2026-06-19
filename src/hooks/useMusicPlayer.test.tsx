@@ -59,6 +59,10 @@ describe('useMusicPlayer', () => {
       configurable: true,
       value: vi.fn(),
     });
+    Object.defineProperty(globalThis, 'Capacitor', {
+      configurable: true,
+      value: undefined,
+    });
     localStorage.clear();
   });
 
@@ -126,6 +130,49 @@ describe('useMusicPlayer', () => {
     expect(result.current.isPlaying).toBe(true);
   });
 
+  it('uses the native audio player for Android content URI songs', async () => {
+    const nativePlayer = {
+      load: vi.fn().mockResolvedValue({ duration: 199 }),
+      play: vi.fn().mockResolvedValue({}),
+      pause: vi.fn().mockResolvedValue({}),
+      seek: vi.fn().mockResolvedValue({}),
+      setVolume: vi.fn().mockResolvedValue({}),
+      getState: vi.fn().mockResolvedValue({ currentTime: 0, duration: 199, isPlaying: true, ended: false }),
+    };
+    Object.defineProperty(globalThis, 'Capacitor', {
+      configurable: true,
+      value: {
+        Plugins: {
+          NativeAudioPlayer: nativePlayer,
+        },
+      },
+    });
+    const nativeSong: Song = {
+      id: 'native-one',
+      name: 'Native One',
+      type: 'audio/mpeg',
+      size: 1024,
+      url: 'content://media/audio/1',
+      nativeUri: 'content://media/audio/1',
+      source: 'android-native',
+    };
+    const { result } = renderHook(() => useMusicPlayer());
+
+    act(() => result.current.addSongs([nativeSong]));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await result.current.togglePlay();
+    });
+
+    expect(nativePlayer.load).toHaveBeenCalledWith({ uri: 'content://media/audio/1', volume: 0.85 });
+    expect(nativePlayer.play).toHaveBeenCalled();
+    expect(audioInstances[0].play).not.toHaveBeenCalled();
+    expect(result.current.duration).toBe(199);
+    expect(result.current.isPlaying).toBe(true);
+  });
+
   it('moves next and previous according to repeat-all rules', () => {
     const { result } = renderHook(() => useMusicPlayer());
     act(() => {
@@ -152,6 +199,19 @@ describe('useMusicPlayer', () => {
 
     expect(result.current.songs.map((song) => song.id)).toEqual(['one', 'three']);
     expect(result.current.currentSong?.id).toBe('three');
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:two');
+  });
+
+  it('removes multiple songs and keeps the next available track selected', () => {
+    const { result } = renderHook(() => useMusicPlayer());
+    act(() => result.current.addSongs([makeSong('one'), makeSong('two'), makeSong('three'), makeSong('four')]));
+    act(() => result.current.next());
+
+    act(() => result.current.removeSongs(['one', 'two']));
+
+    expect(result.current.songs.map((song) => song.id)).toEqual(['three', 'four']);
+    expect(result.current.currentSong?.id).toBe('three');
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:one');
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:two');
   });
 

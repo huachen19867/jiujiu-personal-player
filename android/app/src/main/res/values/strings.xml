@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">99新自用唱机</string>
+    <string name="title_activity_main">99新自用唱机</string>
+    <string name="package_name">cn.jiujiu.personalplayer</string>
+    <string name="custom_url_scheme">cn.jiujiu.personalplayer</string>
+</resources>

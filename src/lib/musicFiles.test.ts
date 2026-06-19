@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   collectAudioFilesFromDirectory,
+  createSongFromNativeAudio,
   createSongsFromFiles,
   isAudioFile,
   supportsDirectoryImport,
@@ -81,12 +82,45 @@ describe('music file utilities', () => {
     expect(songs[0].id).toMatch(/^local-.+-blue-monday-mp3$/);
     expect(songs[1]).toMatchObject({
       name: 'Side B',
-      type: '',
+      type: 'audio/ogg',
       size: 5,
       url: 'blob:Side B.ogg',
-      file: files[2],
+      file: expect.objectContaining({ type: 'audio/ogg' }),
     });
     expect(songs[1].id).toMatch(/^local-.+-side-b-ogg$/);
+  });
+
+  it('normalizes Android ffmpeg MIME reports for mp3 files', () => {
+    const [song] = createSongsFromFiles([
+      new File(['audio'], '青花瓷.mp3', { type: 'audio/ffmpeg' }),
+    ]);
+
+    expect(song.type).toBe('audio/mpeg');
+    expect(song.file?.type).toBe('audio/mpeg');
+    expect(URL.createObjectURL).toHaveBeenCalledWith(expect.objectContaining({ type: 'audio/mpeg' }));
+  });
+
+  it('creates songs from Android native picker assets', () => {
+    const song = createSongFromNativeAudio(
+      {
+        id: 'native-1',
+        name: '白嫁衣.mp3',
+        type: 'audio/ffmpeg',
+        size: 1024,
+        uri: 'content://media/audio/1',
+      },
+      0,
+    );
+
+    expect(song).toMatchObject({
+      id: 'native-1',
+      name: '白嫁衣',
+      type: 'audio/mpeg',
+      size: 1024,
+      url: 'content://media/audio/1',
+      nativeUri: 'content://media/audio/1',
+      source: 'android-native',
+    });
   });
 
   it('generates unique song IDs across separate imports with identical filenames', () => {
