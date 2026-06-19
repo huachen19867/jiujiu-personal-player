@@ -397,32 +397,97 @@ button:disabled {
   position: absolute;
   z-index: 5;
   top: calc(100% + 6px);
-  left: 0;
-  width: min(260px, 82vw);
+  right: 0;
+  width: min(224px, calc(100vw - 48px));
+  max-height: 232px;
   display: grid;
-  gap: 6px;
-  padding: 8px;
+  gap: 4px;
+  padding: 7px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow-hover);
+  overflow-y: auto;
 }
 
-.playlist-picker-menu button {
-  min-height: 38px;
-  padding: 0 10px;
+.playlist-choice {
+  min-width: 0;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
   border-radius: 6px;
+}
+
+.playlist-choice:hover,
+.playlist-choice.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.playlist-choice-check {
+  width: 30px;
+  height: 30px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.playlist-choice-check input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.playlist-choice-box {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: #ffffff;
+  color: transparent;
+}
+
+.playlist-choice-check input:checked + .playlist-choice-box {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.playlist-choice-main {
+  min-width: 0;
+  min-height: 34px;
+  display: grid;
+  align-content: center;
+  gap: 1px;
+  padding: 0 6px;
   background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.86rem;
-  font-weight: 800;
+  color: var(--text-primary);
   text-align: left;
 }
 
-.playlist-picker-menu button:hover,
-.playlist-picker-menu button.is-active {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
+.playlist-choice-main span,
+.playlist-choice-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlist-choice-main span {
+  font-size: 0.88rem;
+  font-weight: 850;
+}
+
+.playlist-choice-main small {
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 700;
 }
 
 .import-panel {
@@ -684,6 +749,15 @@ input[type='range'] {
   line-height: 1.45;
 }
 
+.feedback-account span,
+.feedback-account strong {
+  display: block;
+}
+
+.feedback-account strong {
+  font-size: 1rem;
+}
+
 .feedback-qr {
   width: 112px;
   aspect-ratio: 1;
@@ -716,6 +790,13 @@ input[type='range'] {
   background: var(--surface);
   color: var(--text-secondary);
   font-weight: 700;
+}
+
+.playlist-heading button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
 }
 
 .selection-bar {

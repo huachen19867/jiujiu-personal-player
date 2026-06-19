@@ -70,11 +70,13 @@ function App() {
               song={player.currentSong}
               playlistGroups={player.playlistGroups}
               activePlaylistId={player.activePlaylistId}
-              activePlaylistName={player.activePlaylistName}
+              activePlaylistName={player.currentPlaylistName}
+              selectedPlaylistIds={player.selectedPlaybackPlaylistIds}
               currentTime={player.currentTime}
               duration={player.duration}
               isPlaying={player.isPlaying}
               onSelectPlaylist={player.selectPlaylist}
+              onTogglePlaylistSelection={player.togglePlaybackPlaylist}
             />
 
             <ImportActions

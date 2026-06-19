@@ -40,7 +40,12 @@ public class NativeAudioPlayerPlugin extends Plugin {
             mediaPlayer.setWakeMode(getContext(), PowerManager.PARTIAL_WAKE_LOCK);
             mediaPlayer.setDataSource(getContext(), Uri.parse(uri));
             mediaPlayer.setVolume(volume, volume);
-            mediaPlayer.setOnCompletionListener((player) -> ended = true);
+            mediaPlayer.setOnCompletionListener((player) -> {
+                ended = true;
+                JSObject event = new JSObject();
+                event.put("ended", true);
+                notifyListeners("ended", event);
+            });
             mediaPlayer.prepare();
             ended = false;
 

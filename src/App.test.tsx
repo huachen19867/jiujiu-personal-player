@@ -57,7 +57,8 @@ describe('App', () => {
 
     await user.click(screen.getByRole('button', { name: '问题反馈' }));
 
-    expect(screen.getByText('微信公众号：陈化AI札记')).toBeInTheDocument();
+    expect(screen.getByText('微信公众号是：')).toBeInTheDocument();
+    expect(screen.getByText('陈化AI札记')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: '陈化AI札记微信公众号二维码' })).toHaveAttribute(
       'src',
       '/feedback-qr.jpg',
@@ -188,14 +189,87 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: '歌单一：1 首歌' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '选择播放歌单' }));
-    await user.click(screen.getByRole('button', { name: '歌单二：0 首歌' }));
+    await user.click(screen.getByRole('button', { name: '查看 歌单二' }));
     expect(screen.getByRole('heading', { name: '歌单二：0 首歌' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '选歌，可多选' }));
     expect(await screen.findByRole('heading', { name: '歌单二：1 首歌' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '选择播放歌单' }));
-    expect(screen.getByRole('button', { name: '歌单三：0 首歌' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: '纳入播放 歌单一' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: '纳入播放 歌单三' })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: '查看 歌单三' })).toBeInTheDocument();
+  });
+
+  it('collapses and expands the playlist without deleting songs', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.upload(screen.getByLabelText('选歌，可多选'), [
+      new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
+    ]);
+
+    const playlistPanel = screen.getByRole('region', { name: '歌单' });
+    expect(await within(playlistPanel).findByText('Blue Monday')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '折叠歌单' }));
+
+    expect(within(playlistPanel).queryByText('Blue Monday')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '展开歌单' }));
+
+    expect(within(playlistPanel).getByText('Blue Monday')).toBeInTheDocument();
+  });
+
+  it('can include another playlist for playback without interrupting the current song', async () => {
+    const user = userEvent.setup();
+    const pickAudioFiles = vi
+      .fn()
+      .mockResolvedValueOnce({
+        songs: [
+          {
+            id: 'native-one',
+            name: '白嫁衣.mp3',
+            type: 'audio/ffmpeg',
+            size: 4096,
+            uri: 'content://media/audio/1',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        songs: [
+          {
+            id: 'native-two',
+            name: '青花瓷.mp3',
+            type: 'audio/ffmpeg',
+            size: 8192,
+            uri: 'content://media/audio/2',
+          },
+        ],
+      });
+    Object.defineProperty(globalThis, 'Capacitor', {
+      configurable: true,
+      value: {
+        Plugins: {
+          LocalMusicPicker: { pickAudioFiles },
+        },
+      },
+    });
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: '选歌，可多选' }));
+    await user.click(screen.getByRole('button', { name: '播放' }));
+    expect(await screen.findByText('正在播放 歌单一')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '选择播放歌单' }));
+    await user.click(screen.getByRole('button', { name: '查看 歌单二' }));
+    await user.click(screen.getByRole('button', { name: '选歌，可多选' }));
+
+    await user.click(screen.getByRole('button', { name: '选择播放歌单' }));
+    await user.click(screen.getByRole('checkbox', { name: '纳入播放 歌单二' }));
+
+    expect(screen.getByText('正在播放 歌单一')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '暂停' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: '纳入播放 歌单二' })).toBeChecked();
   });
 
   it('cycles playback mode from the transport controls', async () => {

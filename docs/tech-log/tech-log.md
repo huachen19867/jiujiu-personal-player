@@ -282,3 +282,13 @@ CSS 色板回到 `#f9fafb` 页面、`#ffffff` 卡片、`#111827/#4b5563/#9ca3af`
 本轮还把反馈模块从“个人导航”改为正式“问题反馈”，移除 ASCII 草图，只保留产品化入口；点开后显示“微信公众号：陈化AI札记”和 `public/feedback-qr.jpg`。测试覆盖刷新恢复 Android native 歌曲、移除文件夹入口、反馈模块文案、歌单自动追加、歌单选择器和旧存储迁移。发布版本递增到 `versionCode=4`、`versionName=1.0.3`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.3-debug.apk`。
 
 验证结果：`npm test -- --run` 6 个测试文件、37 条用例通过；`npm run build` 通过；`npm audit --audit-level=moderate` 返回 0 vulnerabilities；`npm run android:apk` 成功产出 APK。APK 复查显示包名 `cn.jiujiu.personalplayer`、`versionCode=4`、`versionName=1.0.3`、应用名 `99新自用唱机`，`apksigner` v2 签名验证通过，`zipalign -c -p 4` 通过。包内资源探针确认包含 `feedback-qr.jpg` 和新版“歌单一/问题反馈”字符串，不再包含“个人导航”“文件夹导入暂不可用”或“来自当前本地歌单”。本次 APK SHA256 为 `41679E57DFBD2DF5108C57791DC4E767515949D04D25C9B055EF00588CAD7C93`。
+
+## 后台续播与歌单选择器修正
+
+本轮真机反馈显示：Android 后台播完一首后自动停在下一首开头。根因不是按钮图标，而是原生播放结束路径的状态顺序有问题：`NativeAudioPlayerPlugin` 的 `MediaPlayer` 完成播放时只把 `ended=true` 存起来，前端靠轮询发现后又先 `setIsPlaying(false)` 再 `next()`，导致下一首即使被选中也按暂停状态加载。现在原生层在 `setOnCompletionListener` 里主动 `notifyListeners("ended")`，前端收到事件或轮询兜底时都走同一个 `advanceAfterTrackEnd()`，先标记下一首需要继续播放，再切歌，避免自动续播被暂停状态吃掉。
+
+歌单状态也做了拆分：`activePlaylistId` 表示当前正在查看/导入的歌单，`currentPlaylistId` 表示当前正在播放的歌单。这样在播放歌单一时打开菜单查看歌单二、给歌单二导入歌曲，或者勾选歌单二进入播放范围，都不会打断正在播放的歌。下一首/自动续播会基于被勾选的歌单生成轻量播放队列；如果用户没有额外勾选，则退回当前播放歌单。
+
+界面上，反馈模块将“微信公众号是：”和“陈化AI札记”拆成两行，避免手机窄屏挤在二维码左侧；播放列表标题区新增“折叠/展开”按钮，方便长歌单时先收起列表；当前播放区的歌单菜单改为窄宽度、右对齐、可滚动的“复选框 + 查看歌单”行，避免上版菜单跑出截图边界。移动视口 `390x844` 冒烟检查显示页面 `scrollWidth=clientWidth=375`，歌单菜单宽约 224px，未出现横向溢出。
+
+新增/更新测试覆盖：原生 `ended` 事件后自动切到下一首并保持播放；反馈公众号换行；歌单折叠不删除歌曲；歌单菜单出现“纳入播放 歌单x”复选框和“查看 歌单x”按钮；勾选另一个歌单不会中断当前播放。验证结果：`npm test -- --run` 6 个测试文件、40 条用例通过；`npm run build` 通过；`npm audit --audit-level=moderate` 返回 0 vulnerabilities。本轮准备重新产出 `versionCode=5`、`versionName=1.0.4` 的 APK，外发路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.4-debug.apk`。

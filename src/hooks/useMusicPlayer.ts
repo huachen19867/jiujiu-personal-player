@@ -10,8 +10,15 @@ const PLAYLIST_NUMERALS = ['一', '二', '三', '四', '五', '六', '七', '八
 type RestoredLibrary = {
   playlists: PlaylistGroup[];
   activePlaylistId: string;
+  currentPlaylistId: string;
   currentIndex: number | null;
   unrestorableSongCount: number;
+};
+
+type PlaybackQueueEntry = {
+  playlistId: string;
+  songIndex: number;
+  song: Song;
 };
 
 export function useMusicPlayer() {
@@ -21,6 +28,10 @@ export function useMusicPlayer() {
   const [audio] = useState(() => new Audio());
   const [playlistGroups, setPlaylistGroups] = useState<PlaylistGroup[]>(restoredLibrary.playlists);
   const [activePlaylistId, setActivePlaylistId] = useState(restoredLibrary.activePlaylistId);
+  const [currentPlaylistId, setCurrentPlaylistId] = useState(restoredLibrary.currentPlaylistId);
+  const [selectedPlaybackPlaylistIds, setSelectedPlaybackPlaylistIds] = useState<string[]>([
+    restoredLibrary.currentPlaylistId,
+  ]);
   const [currentIndex, setCurrentIndex] = useState<number | null>(restoredLibrary.currentIndex);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -29,8 +40,12 @@ export function useMusicPlayer() {
   const [playbackMode, setPlaybackMode] = useState<PlaybackMode>(savedState.playbackMode);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const playlistGroupsRef = useRef<PlaylistGroup[]>(restoredLibrary.playlists);
-  const songsRef = useRef<Song[]>([]);
+  const currentSongsRef = useRef<Song[]>([]);
   const currentSongRef = useRef<Song | null>(null);
+  const currentIndexRef = useRef<number | null>(restoredLibrary.currentIndex);
+  const currentPlaylistIdRef = useRef(restoredLibrary.currentPlaylistId);
+  const selectedPlaybackPlaylistIdsRef = useRef<string[]>([restoredLibrary.currentPlaylistId]);
+  const playbackModeRef = useRef<PlaybackMode>(savedState.playbackMode);
   const volumeRef = useRef(savedState.volume);
   const playlistChangedInSessionRef = useRef(false);
   const playSelectedSongRef = useRef(false);
@@ -39,8 +54,13 @@ export function useMusicPlayer() {
     () => playlistGroups.find((playlist) => playlist.id === activePlaylistId) ?? playlistGroups[0],
     [activePlaylistId, playlistGroups],
   );
+  const currentPlaylist = useMemo(
+    () => playlistGroups.find((playlist) => playlist.id === currentPlaylistId) ?? activePlaylist,
+    [activePlaylist, currentPlaylistId, playlistGroups],
+  );
   const songs = activePlaylist?.songs ?? [];
-  const currentSong = currentIndex === null ? null : songs[currentIndex] ?? null;
+  const currentSongs = currentPlaylist?.songs ?? [];
+  const currentSong = currentIndex === null ? null : currentSongs[currentIndex] ?? null;
   const totalSongCount = playlistGroups.reduce((sum, playlist) => sum + playlist.songs.length, 0);
   const rememberedSongCount =
     totalSongCount === 0 && !playlistChangedInSessionRef.current ? restoredLibrary.unrestorableSongCount : 0;
@@ -50,12 +70,39 @@ export function useMusicPlayer() {
   }, [playlistGroups]);
 
   useEffect(() => {
-    songsRef.current = songs;
-  }, [songs]);
+    currentSongsRef.current = currentSongs;
+  }, [currentSongs]);
 
   useEffect(() => {
     currentSongRef.current = currentSong;
   }, [currentSong]);
+
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
+  useEffect(() => {
+    currentPlaylistIdRef.current = currentPlaylist?.id ?? DEFAULT_PLAYLIST_ID;
+  }, [currentPlaylist?.id]);
+
+  useEffect(() => {
+    selectedPlaybackPlaylistIdsRef.current = selectedPlaybackPlaylistIds;
+  }, [selectedPlaybackPlaylistIds]);
+
+  useEffect(() => {
+    playbackModeRef.current = playbackMode;
+  }, [playbackMode]);
+
+  useEffect(() => {
+    setSelectedPlaybackPlaylistIds((ids) => {
+      const visibleIds = new Set(playlistGroups.map((playlist) => playlist.id));
+      const filteredIds = ids.filter((id) => visibleIds.has(id));
+      if (filteredIds.length) {
+        return filteredIds;
+      }
+      return [currentPlaylist?.id ?? activePlaylist?.id ?? DEFAULT_PLAYLIST_ID];
+    });
+  }, [activePlaylist?.id, currentPlaylist?.id, playlistGroups]);
 
   useEffect(() => {
     volumeRef.current = volume;
@@ -134,35 +181,83 @@ export function useMusicPlayer() {
     setIsPlaying(false);
   }, [audio, nativeAudioPlayer]);
 
-  const goToIndex = useCallback(
-    (index: number | null) => {
-      if (index === null) {
-        pause();
+  const moveToQueueEntry = useCallback((entry: PlaybackQueueEntry | null, shouldKeepPlaying: boolean) => {
+    if (!entry) {
+      setIsPlaying(false);
+      return;
+    }
+
+    if (shouldKeepPlaying) {
+      playSelectedSongRef.current = true;
+      setIsPlaying(true);
+    }
+    setCurrentPlaylistId(entry.playlistId);
+    setCurrentIndex(entry.songIndex);
+  }, []);
+
+  const moveByDirection = useCallback(
+    (direction: 1 | -1, shouldKeepPlaying: boolean) => {
+      const currentSong = currentSongRef.current;
+      if (!currentSong) {
         return;
       }
-      setCurrentIndex(index);
+
+      const queue = createPlaybackQueue(
+        playlistGroupsRef.current,
+        selectedPlaybackPlaylistIdsRef.current,
+        currentPlaylistIdRef.current,
+      );
+      const queueIndex = queue.findIndex((entry) => entry.song.id === currentSong.id);
+
+      if (queueIndex >= 0) {
+        const nextQueueIndex =
+          direction === 1
+            ? getNextIndex(queueIndex, queue.length, playbackModeRef.current)
+            : getPreviousIndex(queueIndex, queue.length, playbackModeRef.current);
+        moveToQueueEntry(nextQueueIndex === null ? null : queue[nextQueueIndex], shouldKeepPlaying);
+        return;
+      }
+
+      const currentIndex = currentIndexRef.current;
+      if (currentIndex === null) {
+        return;
+      }
+
+      const songs = currentSongsRef.current;
+      const nextIndex =
+        direction === 1
+          ? getNextIndex(currentIndex, songs.length, playbackModeRef.current)
+          : getPreviousIndex(currentIndex, songs.length, playbackModeRef.current);
+      moveToQueueEntry(
+        nextIndex === null
+          ? null
+          : {
+              playlistId: currentPlaylistIdRef.current,
+              songIndex: nextIndex,
+              song: songs[nextIndex],
+            },
+        shouldKeepPlaying,
+      );
     },
-    [pause],
+    [moveToQueueEntry],
   );
 
+  const advanceAfterTrackEnd = useCallback(() => {
+    moveByDirection(1, true);
+  }, [moveByDirection]);
+
   const next = useCallback(() => {
-    if (currentIndex === null) {
-      return;
-    }
-    goToIndex(getNextIndex(currentIndex, songs.length, playbackMode));
-  }, [currentIndex, goToIndex, playbackMode, songs.length]);
+    moveByDirection(1, isPlaying);
+  }, [isPlaying, moveByDirection]);
 
   const previous = useCallback(() => {
-    if (currentIndex === null) {
-      return;
-    }
-    goToIndex(getPreviousIndex(currentIndex, songs.length, playbackMode));
-  }, [currentIndex, goToIndex, playbackMode, songs.length]);
+    moveByDirection(-1, isPlaying);
+  }, [isPlaying, moveByDirection]);
 
   useEffect(() => {
     const updateTime = () => setCurrentTime(audio.currentTime);
     const updateDuration = () => setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
-    const handleEnded = () => next();
+    const handleEnded = () => advanceAfterTrackEnd();
     const handleError = () => {
       if (!currentSongRef.current) {
         return;
@@ -182,7 +277,7 @@ export function useMusicPlayer() {
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('error', handleError);
     };
-  }, [audio, next]);
+  }, [advanceAfterTrackEnd, audio]);
 
   useEffect(() => {
     const shouldKeepUnrestorableSavedState =
@@ -224,8 +319,7 @@ export function useMusicPlayer() {
         setCurrentTime(state.currentTime);
         setDuration(state.duration);
         if (state.ended) {
-          setIsPlaying(false);
-          next();
+          advanceAfterTrackEnd();
         }
       } catch {
         if (!canceled) {
@@ -240,7 +334,31 @@ export function useMusicPlayer() {
       canceled = true;
       window.clearInterval(timer);
     };
-  }, [currentSong?.nativeUri, isPlaying, nativeAudioPlayer, next]);
+  }, [advanceAfterTrackEnd, currentSong?.nativeUri, isPlaying, nativeAudioPlayer]);
+
+  useEffect(() => {
+    if (!nativeAudioPlayer?.addListener) {
+      return;
+    }
+
+    let removed = false;
+    let listenerHandle: { remove: () => Promise<void> | void } | null = null;
+
+    void Promise.resolve(nativeAudioPlayer.addListener('ended', advanceAfterTrackEnd)).then((handle) => {
+      if (removed) {
+        void handle.remove();
+        return;
+      }
+      listenerHandle = handle;
+    });
+
+    return () => {
+      removed = true;
+      if (listenerHandle) {
+        void listenerHandle.remove();
+      }
+    };
+  }, [advanceAfterTrackEnd, nativeAudioPlayer]);
 
   useEffect(() => {
     return () => {
@@ -260,7 +378,7 @@ export function useMusicPlayer() {
       }
 
       playlistChangedInSessionRef.current = true;
-      const shouldSelectFirstIncoming = currentIndex === null && songs.length === 0;
+      const shouldSelectFirstIncoming = !currentSong && songs.length === 0;
       setPlaylistGroups((existingGroups) =>
         ensureTrailingEmptyPlaylist(
           existingGroups.map((playlist) =>
@@ -271,10 +389,11 @@ export function useMusicPlayer() {
         ),
       );
       if (shouldSelectFirstIncoming) {
+        setCurrentPlaylistId(activePlaylistId);
         setCurrentIndex(0);
       }
     },
-    [activePlaylistId, currentIndex, songs.length],
+    [activePlaylistId, currentSong, songs.length],
   );
 
   const play = useCallback(async () => {
@@ -320,10 +439,11 @@ export function useMusicPlayer() {
         }
 
         playSelectedSongRef.current = true;
+        setCurrentPlaylistId(activePlaylistId);
         setCurrentIndex(index);
       }
     },
-    [currentIndex, isPlaying, play, songs],
+    [activePlaylistId, currentIndex, isPlaying, play, songs],
   );
 
   const selectPlaylist = useCallback(
@@ -333,15 +453,29 @@ export function useMusicPlayer() {
         return;
       }
 
-      pause();
       setActivePlaylistId(playlist.id);
+      setErrorMessage(null);
+
+      if (isPlaying && currentSongRef.current) {
+        return;
+      }
+
+      setCurrentPlaylistId(playlist.id);
       setCurrentIndex(playlist.songs.length ? 0 : null);
       setCurrentTime(0);
       setDuration(0);
-      setErrorMessage(null);
     },
-    [activePlaylistId, pause, playlistGroups],
+    [activePlaylistId, isPlaying, playlistGroups],
   );
+
+  const togglePlaybackPlaylist = useCallback((playlistId: string) => {
+    setSelectedPlaybackPlaylistIds((ids) => {
+      if (ids.includes(playlistId)) {
+        return ids.length > 1 ? ids.filter((id) => id !== playlistId) : ids;
+      }
+      return [...ids, playlistId];
+    });
+  }, []);
 
   const seek = useCallback(
     (time: number) => {
@@ -386,8 +520,14 @@ export function useMusicPlayer() {
       );
 
       if (nextSongs.length === 0) {
-        setCurrentIndex(null);
-        pause();
+        if (currentPlaylistId === activePlaylistId) {
+          setCurrentIndex(null);
+          pause();
+        }
+        return;
+      }
+
+      if (currentPlaylistId !== activePlaylistId) {
         return;
       }
 
@@ -410,7 +550,7 @@ export function useMusicPlayer() {
 
       setCurrentIndex(replacement ? nextSongs.findIndex((song) => song.id === replacement.id) : null);
     },
-    [activePlaylistId, currentIndex, pause, songs],
+    [activePlaylistId, currentIndex, currentPlaylistId, pause, songs],
   );
 
   const removeSong = useCallback(
@@ -430,15 +570,20 @@ export function useMusicPlayer() {
         existingGroups.map((playlist) => (playlist.id === activePlaylistId ? { ...playlist, songs: [] } : playlist)),
       ),
     );
-    setCurrentIndex(null);
-    pause();
-  }, [activePlaylistId, pause, songs]);
+    if (currentPlaylistId === activePlaylistId) {
+      setCurrentIndex(null);
+      pause();
+    }
+  }, [activePlaylistId, currentPlaylistId, pause, songs]);
 
   return {
     songs,
     playlistGroups,
     activePlaylistId,
     activePlaylistName: activePlaylist?.name ?? DEFAULT_PLAYLIST_NAME,
+    currentPlaylistId: currentPlaylist?.id ?? DEFAULT_PLAYLIST_ID,
+    currentPlaylistName: currentPlaylist?.name ?? DEFAULT_PLAYLIST_NAME,
+    selectedPlaybackPlaylistIds,
     activePlaylist,
     currentSong,
     currentIndex,
@@ -456,6 +601,7 @@ export function useMusicPlayer() {
     togglePlay,
     playSong,
     selectPlaylist,
+    togglePlaybackPlaylist,
     next,
     previous,
     seek,
@@ -487,12 +633,17 @@ function restoreLibrary(
 
   const playlists = ensureTrailingEmptyPlaylist(restoredPlaylists);
   const activePlaylist = playlists.find((playlist) => playlist.id === storedActivePlaylistId) ?? playlists[0];
-  const savedSongIndex = activePlaylist.songs.findIndex((song) => song.id === storedCurrentSongId);
-  const currentIndex = savedSongIndex >= 0 ? savedSongIndex : activePlaylist.songs.length ? 0 : null;
+  const playlistWithSavedSong = playlists.find((playlist) =>
+    playlist.songs.some((song) => song.id === storedCurrentSongId),
+  );
+  const currentPlaylist = playlistWithSavedSong ?? activePlaylist;
+  const savedSongIndex = currentPlaylist.songs.findIndex((song) => song.id === storedCurrentSongId);
+  const currentIndex = savedSongIndex >= 0 ? savedSongIndex : currentPlaylist.songs.length ? 0 : null;
 
   return {
     playlists,
     activePlaylistId: activePlaylist.id,
+    currentPlaylistId: currentPlaylist.id,
     currentIndex,
     unrestorableSongCount,
   };
@@ -546,4 +697,36 @@ function createPlaylistId(index: number) {
 
 function createPlaylistName(index: number) {
   return `歌单${PLAYLIST_NUMERALS[index] ?? index + 1}`;
+}
+
+function createPlaybackQueue(
+  playlists: PlaylistGroup[],
+  selectedPlaylistIds: string[],
+  fallbackPlaylistId: string,
+): PlaybackQueueEntry[] {
+  const selectedIds = selectedPlaylistIds.length ? selectedPlaylistIds : [fallbackPlaylistId];
+  const selectedIdSet = new Set(selectedIds);
+  const queue = playlists.flatMap((playlist) =>
+    selectedIdSet.has(playlist.id)
+      ? playlist.songs.map((song, songIndex) => ({
+          playlistId: playlist.id,
+          songIndex,
+          song,
+        }))
+      : [],
+  );
+
+  if (queue.length) {
+    return queue;
+  }
+
+  return playlists.flatMap((playlist) =>
+    playlist.id === fallbackPlaylistId
+      ? playlist.songs.map((song, songIndex) => ({
+          playlistId: playlist.id,
+          songIndex,
+          song,
+        }))
+      : [],
+  );
 }

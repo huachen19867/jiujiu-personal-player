@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import type { PlaylistGroup, Song } from '../types/music';
 import { formatDuration } from '../lib/format';
 
@@ -8,10 +8,12 @@ interface NowPlayingProps {
   playlistGroups: PlaylistGroup[];
   activePlaylistId: string;
   activePlaylistName: string;
+  selectedPlaylistIds: string[];
   currentTime: number;
   duration: number;
   isPlaying: boolean;
   onSelectPlaylist: (playlistId: string) => void;
+  onTogglePlaylistSelection: (playlistId: string) => void;
 }
 
 interface PlayerDiscMarkProps {
@@ -69,10 +71,12 @@ export function NowPlaying({
   playlistGroups,
   activePlaylistId,
   activePlaylistName,
+  selectedPlaylistIds,
   currentTime,
   duration,
   isPlaying,
   onSelectPlaylist,
+  onTogglePlaylistSelection,
 }: NowPlayingProps) {
   const isDiscActive = Boolean(song && isPlaying);
   const [playlistMenuOpen, setPlaylistMenuOpen] = useState(false);
@@ -108,19 +112,36 @@ export function NowPlaying({
               <ChevronDown aria-hidden="true" size={16} />
             </button>
             {playlistMenuOpen ? (
-              <div className="playlist-picker-menu" role="listbox" aria-label="播放歌单">
+              <div className="playlist-picker-menu" role="group" aria-label="播放歌单">
                 {playlistGroups.map((playlist) => (
-                  <button
-                    className={playlist.id === activePlaylistId ? 'is-active' : ''}
+                  <div
+                    className={playlist.id === activePlaylistId ? 'playlist-choice is-active' : 'playlist-choice'}
                     key={playlist.id}
-                    type="button"
-                    onClick={() => {
-                      onSelectPlaylist(playlist.id);
-                      setPlaylistMenuOpen(false);
-                    }}
                   >
-                    {playlist.name}：{playlist.songs.length} 首歌
-                  </button>
+                    <label className="playlist-choice-check">
+                      <input
+                        type="checkbox"
+                        aria-label={`纳入播放 ${playlist.name}`}
+                        checked={selectedPlaylistIds.includes(playlist.id)}
+                        onChange={() => onTogglePlaylistSelection(playlist.id)}
+                      />
+                      <span className="playlist-choice-box" aria-hidden="true">
+                        <Check size={12} />
+                      </span>
+                    </label>
+                    <button
+                      className="playlist-choice-main"
+                      type="button"
+                      aria-label={`查看 ${playlist.name}`}
+                      onClick={() => {
+                        onSelectPlaylist(playlist.id);
+                        setPlaylistMenuOpen(false);
+                      }}
+                    >
+                      <span>{playlist.name}</span>
+                      <small>{playlist.songs.length} 首歌</small>
+                    </button>
+                  </div>
                 ))}
               </div>
             ) : null}

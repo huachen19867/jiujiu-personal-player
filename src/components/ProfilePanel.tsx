@@ -27,7 +27,10 @@ export function ProfilePanel() {
         <div className="feedback-detail" aria-label="问题反馈联系方式">
           <div className="feedback-copy">
             <QrCode aria-hidden="true" size={18} />
-            <p className="feedback-account">微信公众号：陈化AI札记</p>
+            <p className="feedback-account">
+              <span>微信公众号是：</span>
+              <strong>陈化AI札记</strong>
+            </p>
           </div>
           <img className="feedback-qr" src="/feedback-qr.jpg" alt="陈化AI札记微信公众号二维码" />
         </div>

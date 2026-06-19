@@ -209,6 +209,74 @@ describe('useMusicPlayer', () => {
     expect(result.current.isPlaying).toBe(true);
   });
 
+  it('continues to the next native track when Android playback completes', async () => {
+    let endedListener: (() => void) | null = null;
+    const nativePlayer = {
+      load: vi.fn().mockResolvedValue({ duration: 199 }),
+      play: vi.fn().mockResolvedValue({}),
+      pause: vi.fn().mockResolvedValue({}),
+      seek: vi.fn().mockResolvedValue({}),
+      setVolume: vi.fn().mockResolvedValue({}),
+      getState: vi.fn().mockResolvedValue({ currentTime: 0, duration: 199, isPlaying: true, ended: false }),
+      addListener: vi.fn((eventName: string, listener: () => void) => {
+        if (eventName === 'ended') {
+          endedListener = listener;
+        }
+        return Promise.resolve({ remove: vi.fn() });
+      }),
+    };
+    Object.defineProperty(globalThis, 'Capacitor', {
+      configurable: true,
+      value: {
+        Plugins: {
+          NativeAudioPlayer: nativePlayer,
+        },
+      },
+    });
+    const nativeSongs: Song[] = [
+      {
+        id: 'native-one',
+        name: 'Native One',
+        type: 'audio/mpeg',
+        size: 1024,
+        url: 'content://media/audio/1',
+        nativeUri: 'content://media/audio/1',
+        source: 'android-native',
+      },
+      {
+        id: 'native-two',
+        name: 'Native Two',
+        type: 'audio/mpeg',
+        size: 2048,
+        url: 'content://media/audio/2',
+        nativeUri: 'content://media/audio/2',
+        source: 'android-native',
+      },
+    ];
+    const { result } = renderHook(() => useMusicPlayer());
+
+    act(() => result.current.addSongs(nativeSongs));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await result.current.togglePlay();
+    });
+    nativePlayer.load.mockClear();
+    nativePlayer.play.mockClear();
+
+    await act(async () => {
+      endedListener?.();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.currentSong?.id).toBe('native-two');
+    expect(result.current.isPlaying).toBe(true);
+    expect(nativePlayer.load).toHaveBeenLastCalledWith({ uri: 'content://media/audio/2', volume: 0.85 });
+    expect(nativePlayer.play).toHaveBeenCalled();
+  });
+
   it('moves next and previous according to repeat-all rules', () => {
     const { result } = renderHook(() => useMusicPlayer());
     act(() => {
