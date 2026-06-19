@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ImportActions } from './components/ImportActions';
 import { NowPlaying } from './components/NowPlaying';
 import { Playlist } from './components/Playlist';
+import { PlaylistSwitcher } from './components/PlaylistSwitcher';
 import { ProfilePanel } from './components/ProfilePanel';
 import { TransportControls } from './components/TransportControls';
 import { APP_BRAND } from './config/brand';
@@ -69,18 +70,23 @@ function App() {
             <NowPlaying
               song={player.currentSong}
               playlistGroups={player.playlistGroups}
-              activePlaylistId={player.activePlaylistId}
               activePlaylistName={player.currentPlaylistName}
               selectedPlaylistIds={player.selectedPlaybackPlaylistIds}
               currentTime={player.currentTime}
               duration={player.duration}
               isPlaying={player.isPlaying}
-              onSelectPlaylist={player.selectPlaylist}
               onTogglePlaylistSelection={player.togglePlaybackPlaylist}
+            />
+
+            <PlaylistSwitcher
+              playlists={player.playlistGroups}
+              activePlaylistId={player.activePlaylistId}
+              onSelectPlaylist={player.selectPlaylist}
             />
 
             <ImportActions
               notice={notice ?? player.errorMessage ?? reauthorizationNotice}
+              targetPlaylistName={player.activePlaylistName}
               nativeAudioImportSupported={nativeAudioImportSupported}
               onFilesSelected={addFiles}
               onNativeAudioImport={importNativeAudio}

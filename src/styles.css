@@ -490,6 +490,82 @@ button:disabled {
   font-weight: 700;
 }
 
+.playlist-switcher {
+  padding: 12px 14px;
+}
+
+.playlist-switcher-track {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.playlist-switcher-track::-webkit-scrollbar {
+  display: none;
+}
+
+.playlist-tab {
+  min-width: 116px;
+  min-height: 50px;
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 6px;
+  row-gap: 1px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.playlist-tab:hover,
+.playlist-tab.is-active {
+  border-color: rgba(244, 119, 42, 0.34);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+.playlist-tab svg {
+  grid-row: 1 / span 2;
+  color: var(--accent);
+}
+
+.playlist-tab-spacer {
+  width: 15px;
+  height: 15px;
+  grid-row: 1 / span 2;
+}
+
+.playlist-tab span,
+.playlist-tab small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlist-tab span {
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+.playlist-tab small {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 .import-panel {
   flex-wrap: wrap;
   gap: 10px;
@@ -502,6 +578,7 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 9px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -535,6 +612,24 @@ button:disabled {
 
 .import-button svg {
   color: var(--accent);
+}
+
+.import-target,
+.import-caption {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-target {
+  font-size: 0.94rem;
+}
+
+.import-caption {
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .file-import {

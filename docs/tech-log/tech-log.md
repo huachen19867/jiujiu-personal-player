@@ -292,3 +292,15 @@ CSS 色板回到 `#f9fafb` 页面、`#ffffff` 卡片、`#111827/#4b5563/#9ca3af`
 界面上，反馈模块将“微信公众号是：”和“陈化AI札记”拆成两行，避免手机窄屏挤在二维码左侧；播放列表标题区新增“折叠/展开”按钮，方便长歌单时先收起列表；当前播放区的歌单菜单改为窄宽度、右对齐、可滚动的“复选框 + 查看歌单”行，避免上版菜单跑出截图边界。移动视口 `390x844` 冒烟检查显示页面 `scrollWidth=clientWidth=375`，歌单菜单宽约 224px，未出现横向溢出。
 
 新增/更新测试覆盖：原生 `ended` 事件后自动切到下一首并保持播放；反馈公众号换行；歌单折叠不删除歌曲；歌单菜单出现“纳入播放 歌单x”复选框和“查看 歌单x”按钮；勾选另一个歌单不会中断当前播放。验证结果：`npm test -- --run` 6 个测试文件、40 条用例通过；`npm run build` 通过；`npm audit --audit-level=moderate` 返回 0 vulnerabilities。本轮准备重新产出 `versionCode=5`、`versionName=1.0.4` 的 APK，外发路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.4-debug.apk`。
+
+## 歌单导入目标与播放范围拆分
+
+本轮针对真机反馈里的“选歌到底选进哪个歌单”做了产品结构修正。原先把“纳入播放”和“查看歌单”塞在当前播放区下拉菜单里，短期能用，但语义混杂：正在播放歌单一时，如果想给歌单二加歌，就容易误以为切换菜单会打断播放，也容易让导入按钮默认继续指向歌单一。现在新增独立 `PlaylistSwitcher`，它只表示“当前正在查看/导入的歌单”；`NowPlaying` 里的下拉只保留“播放范围”复选框，用于决定下一首/自动续播可从哪些歌单取歌。
+
+实现边界是：`activePlaylistId` 继续负责视图和导入目标，`currentPlaylistId` 继续负责实际正在播放的歌单。切换 `PlaylistSwitcher` 不会暂停、换歌或重置进度；导入按钮文案改为“添加到：歌单x / 选歌，可多选”，让手机端用户在点击前就能知道文件会进哪个分组。当歌单一有歌后，歌单二会直接出现在切换条；歌单二有歌后再露出歌单三，由 `ensureTrailingEmptyPlaylist` 维持这个尾部空歌单模型。
+
+新增测试覆盖：初始渲染存在“歌单切换”区域；导入按钮显示并暴露“添加到：歌单一，选歌，可多选”；歌单一导入后出现可查看的歌单二；切到歌单二后导入目标变成歌单二；歌单二导入后出现歌单三；播放范围菜单只显示“纳入播放 歌单x”复选框，不再承担查看歌单职责；播放中切换查看歌单二并导入歌曲，不会中断正在播放的歌单一。
+
+验证结果：`npm test -- --run src/App.test.tsx` 13 条用例通过；`npm test -- --run` 6 个测试文件、40 条用例通过；`npm run build` 通过；`npm audit --audit-level=moderate` 返回 0 vulnerabilities。移动视口 `390x844` 用本机 Chrome + Playwright 冒烟检查，`clientWidth=390`、`scrollWidth=390`，新切换条可见，导入按钮显示“添加到：歌单一”，没有横向溢出。
+
+发布版本递增到 `versionCode=6`、`versionName=1.0.5`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.5-debug.apk`。APK 复查结果：`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。同步进 Android 的资源中已确认包含“歌单切换”“添加到：歌单一”“选择播放范围”，没有旧的“选择播放歌单”。本次 APK SHA256 为 `F1B6E71BB5A281851AD0B74019295E57F95428A8AEF60E81D782F5CD28D5A335`。

@@ -6,13 +6,11 @@ import { formatDuration } from '../lib/format';
 interface NowPlayingProps {
   song: Song | null;
   playlistGroups: PlaylistGroup[];
-  activePlaylistId: string;
   activePlaylistName: string;
   selectedPlaylistIds: string[];
   currentTime: number;
   duration: number;
   isPlaying: boolean;
-  onSelectPlaylist: (playlistId: string) => void;
   onTogglePlaylistSelection: (playlistId: string) => void;
 }
 
@@ -69,13 +67,11 @@ function PlayerDiscMark({ isPlaying }: PlayerDiscMarkProps) {
 export function NowPlaying({
   song,
   playlistGroups,
-  activePlaylistId,
   activePlaylistName,
   selectedPlaylistIds,
   currentTime,
   duration,
   isPlaying,
-  onSelectPlaylist,
   onTogglePlaylistSelection,
 }: NowPlayingProps) {
   const isDiscActive = Boolean(song && isPlaying);
@@ -102,7 +98,7 @@ export function NowPlaying({
             <button
               className="playlist-picker-trigger"
               type="button"
-              aria-label="选择播放歌单"
+              aria-label="选择播放范围"
               aria-expanded={playlistMenuOpen}
               onClick={() => setPlaylistMenuOpen((open) => !open)}
             >
@@ -114,11 +110,11 @@ export function NowPlaying({
             {playlistMenuOpen ? (
               <div className="playlist-picker-menu" role="group" aria-label="播放歌单">
                 {playlistGroups.map((playlist) => (
-                  <div
-                    className={playlist.id === activePlaylistId ? 'playlist-choice is-active' : 'playlist-choice'}
+                  <label
+                    className={selectedPlaylistIds.includes(playlist.id) ? 'playlist-choice is-active' : 'playlist-choice'}
                     key={playlist.id}
                   >
-                    <label className="playlist-choice-check">
+                    <span className="playlist-choice-check">
                       <input
                         type="checkbox"
                         aria-label={`纳入播放 ${playlist.name}`}
@@ -128,20 +124,12 @@ export function NowPlaying({
                       <span className="playlist-choice-box" aria-hidden="true">
                         <Check size={12} />
                       </span>
-                    </label>
-                    <button
-                      className="playlist-choice-main"
-                      type="button"
-                      aria-label={`查看 ${playlist.name}`}
-                      onClick={() => {
-                        onSelectPlaylist(playlist.id);
-                        setPlaylistMenuOpen(false);
-                      }}
-                    >
+                    </span>
+                    <span className="playlist-choice-main">
                       <span>{playlist.name}</span>
                       <small>{playlist.songs.length} 首歌</small>
-                    </button>
-                  </div>
+                    </span>
+                  </label>
                 ))}
               </div>
             ) : null}

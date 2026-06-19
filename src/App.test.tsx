@@ -41,7 +41,10 @@ describe('App', () => {
     render(<App />);
 
     expect(screen.getByText('99新自用唱机')).toBeInTheDocument();
-    expect(screen.getByLabelText('选歌，可多选')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '歌单切换' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查看 歌单一' })).toBeInTheDocument();
+    expect(screen.getByText('添加到：歌单一')).toBeInTheDocument();
+    expect(screen.getByLabelText('添加到：歌单一，选歌，可多选')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /文件夹导入/ })).not.toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: '问题反馈' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '问题反馈' })).toBeInTheDocument();
@@ -96,7 +99,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.upload(screen.getByLabelText('选歌，可多选'), [
+    await user.upload(screen.getByLabelText('添加到：歌单一，选歌，可多选'), [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
       new File(['text'], 'notes.txt', { type: 'text/plain' }),
       new File(['audio'], 'Late Night.flac', { type: '' }),
@@ -139,7 +142,7 @@ describe('App', () => {
 
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: '选歌，可多选' }));
+    await user.click(screen.getByRole('button', { name: /添加到：歌单一/ }));
 
     expect(pickAudioFiles).toHaveBeenCalled();
     const playlist = screen.getByRole('list', { name: '播放列表' });
@@ -185,27 +188,31 @@ describe('App', () => {
 
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: '选歌，可多选' }));
+    await user.click(screen.getByRole('button', { name: /添加到：歌单一/ }));
     expect(await screen.findByRole('heading', { name: '歌单一：1 首歌' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查看 歌单二' })).toBeInTheDocument();
+    expect(screen.getByText('添加到：歌单一')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '选择播放歌单' }));
     await user.click(screen.getByRole('button', { name: '查看 歌单二' }));
     expect(screen.getByRole('heading', { name: '歌单二：0 首歌' })).toBeInTheDocument();
+    expect(screen.getByText('添加到：歌单二')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '选歌，可多选' }));
+    await user.click(screen.getByRole('button', { name: /添加到：歌单二/ }));
     expect(await screen.findByRole('heading', { name: '歌单二：1 首歌' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '选择播放歌单' }));
+    expect(screen.getByRole('button', { name: '查看 歌单三' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '选择播放范围' }));
+    const playbackRangeMenu = screen.getByRole('group', { name: '播放歌单' });
     expect(screen.getByRole('checkbox', { name: '纳入播放 歌单一' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: '纳入播放 歌单三' })).not.toBeChecked();
-    expect(screen.getByRole('button', { name: '查看 歌单三' })).toBeInTheDocument();
+    expect(within(playbackRangeMenu).queryByRole('button', { name: '查看 歌单三' })).not.toBeInTheDocument();
   });
 
   it('collapses and expands the playlist without deleting songs', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.upload(screen.getByLabelText('选歌，可多选'), [
+    await user.upload(screen.getByLabelText('添加到：歌单一，选歌，可多选'), [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
     ]);
 
@@ -256,15 +263,15 @@ describe('App', () => {
 
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: '选歌，可多选' }));
+    await user.click(screen.getByRole('button', { name: /添加到：歌单一/ }));
     await user.click(screen.getByRole('button', { name: '播放' }));
     expect(await screen.findByText('正在播放 歌单一')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '选择播放歌单' }));
     await user.click(screen.getByRole('button', { name: '查看 歌单二' }));
-    await user.click(screen.getByRole('button', { name: '选歌，可多选' }));
+    expect(screen.getByText('添加到：歌单二')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /添加到：歌单二/ }));
 
-    await user.click(screen.getByRole('button', { name: '选择播放歌单' }));
+    await user.click(screen.getByRole('button', { name: '选择播放范围' }));
     await user.click(screen.getByRole('checkbox', { name: '纳入播放 歌单二' }));
 
     expect(screen.getByText('正在播放 歌单一')).toBeInTheDocument();
@@ -276,7 +283,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.upload(screen.getByLabelText('选歌，可多选'), [
+    await user.upload(screen.getByLabelText('添加到：歌单一，选歌，可多选'), [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
     ]);
 
@@ -293,7 +300,7 @@ describe('App', () => {
     expect(container.querySelector('.disc-play-mark')).toBeInTheDocument();
     expect(container.querySelector('.disc-pause-mark')).not.toBeInTheDocument();
 
-    await user.upload(screen.getByLabelText('选歌，可多选'), [
+    await user.upload(screen.getByLabelText('添加到：歌单一，选歌，可多选'), [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
     ]);
 
@@ -319,7 +326,7 @@ describe('App', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<App />);
 
-    await user.upload(screen.getByLabelText('选歌，可多选'), [
+    await user.upload(screen.getByLabelText('添加到：歌单一，选歌，可多选'), [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
       new File(['audio'], 'Late Night.flac', { type: '' }),
     ]);
@@ -342,7 +349,7 @@ describe('App', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<App />);
 
-    await user.upload(screen.getByLabelText('选歌，可多选'), [
+    await user.upload(screen.getByLabelText('添加到：歌单一，选歌，可多选'), [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
       new File(['audio'], 'Late Night.flac', { type: '' }),
       new File(['audio'], 'Third Song.wav', { type: 'audio/wav' }),
@@ -365,7 +372,7 @@ describe('App', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<App />);
 
-    await user.upload(screen.getByLabelText('选歌，可多选'), [
+    await user.upload(screen.getByLabelText('添加到：歌单一，选歌，可多选'), [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
       new File(['audio'], 'Late Night.flac', { type: '' }),
     ]);
