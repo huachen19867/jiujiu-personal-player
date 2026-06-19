@@ -239,7 +239,7 @@ CSS 色板回到 `#f9fafb` 页面、`#ffffff` 卡片、`#111827/#4b5563/#9ca3af`
 
 播放列表体验补了两个安全边界：单首删除、清空、批量删除都先走 `window.confirm`，避免误触；`Playlist` 增加多选模式、选中计数和“删除所选 N 首”。底层 `useMusicPlayer` 新增 `removeSongs(songIds)`，会统一撤销 object URL、删除歌曲，并在删掉当前歌曲时选择下一首可用歌曲；如果歌单被删空则暂停并清空当前索引。
 
-视觉和上架准备方面，使用 `pic/3.png` 重新生成了纯白底 app icon、favicon 与 Android launcher/splash 资源，并将蓝色声波替换为 ColaOS 风格浅橙色。开屏图标背景已与外层纯白融合，避免原先图标与背景不和谐。上架文案草稿写入 `docs/store-listing-draft.md`，同时新增 `ProfilePanel` 作为“个人导航”模块，暂用 ASCII 草图和“公众号：待填写”占位，后续拿到公众号名称或二维码再替换。
+视觉和上架准备方面，使用 `pic/3.png` 重新生成了纯白底 app icon、favicon 与 Android launcher/splash 资源，并将蓝色声波替换为 ColaOS 风格浅橙色。开屏图标背景已与外层纯白融合，避免原先图标与背景不和谐。上架文案草稿写入 `docs/store-listing-draft.md`，同时新增 `ProfilePanel` 作为“个人导航”模块，最初暂用 ASCII 草图和“公众号：待填写”占位，后续应替换为正式反馈入口。
 
 本轮新增/更新的测试覆盖点包括：手机端文件导入入口应为多选；不支持文件夹导入时按钮禁用；个人导航模块存在；单首删除取消确认时不删除；批量删除确认后删除所选歌曲；批量删除取消确认时保留歌曲；hook 层批量删除当前歌曲时保持后继歌曲可用。
 
@@ -262,3 +262,11 @@ CSS 色板回到 `#f9fafb` 页面、`#ffffff` 卡片、`#111827/#4b5563/#9ca3af`
 系统确认框按钮色来自 Android AlertDialog，不受网页 CSS 控制。项目 `styles.xml` 引用了 `colorAccent`，但此前没有自定义 `colors.xml`，因此按钮落到系统/依赖默认青绿色。本轮新增 `colors.xml`，将 `colorPrimary`、`colorPrimaryDark`、`colorAccent` 统一为橙色系。Android 开屏也从只设置 `android:background` 改为 Theme.SplashScreen 的 `windowSplashScreenBackground`、`windowSplashScreenAnimatedIcon` 和 `postSplashScreenTheme`，背景固定纯白，并新增 `splash_icon.png` 供系统开屏使用。
 
 新增测试覆盖：`audio/ffmpeg + .mp3` 会纠正为 `audio/mpeg`；Android 原生 picker 返回的歌曲能进入歌单；native content URI 歌曲播放时调用 `NativeAudioPlayer.load/play` 而不是 Web Audio。验证结果：`npm test -- --run` 6 个测试文件、35 条用例通过；`npm run build` 通过；`npm audit --audit-level=moderate` 返回 0 vulnerabilities；`npm run android:apk` 成功产出 `1.0.1` debug APK。
+
+## 问题反馈入口与公众号二维码
+
+本轮把底部 `ProfilePanel` 的占位 ASCII 模块改成正式两层入口：第一层只显示“问题反馈”，保持底部信息轻，不把公众号和二维码直接铺在主界面；点开后第二层显示“微信公众号：陈化AI札记”和二维码。二维码源文件来自用户提供的微信图片，复制为 `public/feedback-qr.jpg`，由 Vite/Capacitor 打包进 APK，避免运行时依赖外部链接。
+
+实现上让 `ProfilePanel` 自己维护展开状态，按钮使用 `aria-label="问题反馈"` 和 `aria-expanded`，可被测试和读屏识别；视觉上仍保留 ASCII 边框语气，但外层用 8px 细边框卡片保证手机端触控面积。新增回归测试覆盖初始不展示公众号、点击“问题反馈”后展示公众号名和二维码图片，避免以后又退回“待填写”占位。
+
+由于本轮会重新产出手机安装包，同时将 Android `versionCode` 从 2 递增到 3、`versionName` 从 `1.0.1` 递增到 `1.0.2`，并把 `android:copy-apk` 的版本化输出改为 `C:\AI\Android\jiujiu-personal-player-v1.0.2-debug.apk`。后续每次给手机下载的新包都应重复这个动作，否则真机容易继续遇到“下载了新包但不像覆盖升级”的混乱体验。

@@ -29,7 +29,7 @@ npm run android:apk
 当前调试 APK 会复制到两个位置：
 
 - `C:\AI\Android\jiujiu-personal-player-debug.apk`
-- `C:\AI\Android\jiujiu-personal-player-v1.0.1-debug.apk`
+- `C:\AI\Android\jiujiu-personal-player-v1.0.2-debug.apk`
 
 优先把带版本号的文件发到 Android 手机，允许“安装未知来源应用”即可安装打开。后续每次发包都要递增 Android `versionCode`，否则部分手机可能不会把新包稳定识别为覆盖升级。
 

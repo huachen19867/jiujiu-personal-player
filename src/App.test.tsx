@@ -48,8 +48,22 @@ describe('App', () => {
     expect(screen.getByLabelText('选歌，可多选')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '文件夹导入暂不可用' })).toBeDisabled();
     expect(screen.getByRole('navigation', { name: '个人导航' })).toBeInTheDocument();
-    expect(screen.getByText('公众号：待填写')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '问题反馈' })).toBeInTheDocument();
+    expect(screen.queryByText('微信公众号：陈化AI札记')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: '还没有歌' })).toBeInTheDocument();
+  });
+
+  it('opens the feedback contact card from the bottom profile panel', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: '问题反馈' }));
+
+    expect(screen.getByText('微信公众号：陈化AI札记')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '陈化AI札记微信公众号二维码' })).toHaveAttribute(
+      'src',
+      '/feedback-qr.jpg',
+    );
   });
 
   it('shows that a saved playlist needs file reauthorization after refresh', () => {

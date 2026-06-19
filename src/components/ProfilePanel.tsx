@@ -1,18 +1,34 @@
+import { useState } from 'react';
+
 export function ProfilePanel() {
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const arrow = isFeedbackOpen ? '<' : '>';
+
   return (
     <nav className="profile-panel" aria-label="个人导航">
       <div>
         <p className="section-kicker">PROFILE</p>
         <h2>个人导航</h2>
       </div>
-      <pre className="profile-ascii" aria-label="公众号导航示意">
+      <button
+        className="feedback-entry"
+        type="button"
+        aria-label="问题反馈"
+        aria-expanded={isFeedbackOpen}
+        onClick={() => setIsFeedbackOpen((open) => !open)}
+      >
+        <span className="profile-ascii" aria-hidden="true">
 {`+----------------------+
-| ABOUT  MP  ARCHIVE   |
-| 99 PLAYER / LOCAL    |
-| WECHAT: TO-BE-FILLED |
+| 问题反馈          ${arrow} |
 +----------------------+`}
-      </pre>
-      <p>公众号：待填写</p>
+        </span>
+      </button>
+      {isFeedbackOpen ? (
+        <div className="feedback-detail" aria-label="问题反馈联系方式">
+          <p className="feedback-account">微信公众号：陈化AI札记</p>
+          <img className="feedback-qr" src="/feedback-qr.jpg" alt="陈化AI札记微信公众号二维码" />
+        </div>
+      ) : null}
     </nav>
   );
 }
