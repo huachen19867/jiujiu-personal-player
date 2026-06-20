@@ -233,13 +233,13 @@ CSS 色板回到 `#f9fafb` 页面、`#ffffff` 卡片、`#111827/#4b5563/#9ca3af`
 
 架构判断已经沉淀到 `docs/release-and-distribution.md`：当前项目是 Vite + React 前端播放器，加 Capacitor Android 原生壳；没有独立后端，也没有热更新。每次改播放器代码后应重新 `npm run android:apk` 产出 APK。只要包名与签名保持一致，Android 会把新包视为同一个应用的升级；当前 debug APK 适合自测和朋友试用，正式上架前必须改为 release 签名并长期保存签名文件。第一版不建议做远程热更新，避免为一个本地播放器引入额外服务端、审核风险和维护成本。
 
-分发判断：GitHub Releases 适合技术用户和版本归档，手机可直接下载 release asset；给普通朋友用时更适合做一个独立下载页，下载按钮可以仍然指向 GitHub Release。若后续上架应用商店，需要准备 release/AAB、隐私政策、截图、图标和商店介绍，应用表述应强调“播放用户已经合法保存到本地的音频文件”，避免暗示获取侵权音乐。
+分发判断：GitHub Releases 适合技术用户和版本归档，手机可直接下载 release asset；给普通朋友用时更适合做一个独立下载页，下载按钮可以仍然指向 GitHub Release。若后续正式分发，需要准备 release/AAB、隐私政策、截图、图标和基础资料，应用表述应强调“播放用户已经合法保存到本地的音频文件”，避免暗示获取侵权音乐。
 
 手机端“导入文件夹”不可用的根因是网页目录选择依赖 File System Access API（例如 `showDirectoryPicker`），该能力在 Android WebView 和多数手机浏览器里不可用。实现上给 `ImportActions` 增加 `directoryImportSupported`，不支持时禁用文件夹按钮并显示“文件夹导入暂不可用”；稳定主入口保持普通文件选择器，并明确标注“选歌，可多选”。
 
 播放列表体验补了两个安全边界：单首删除、清空、批量删除都先走 `window.confirm`，避免误触；`Playlist` 增加多选模式、选中计数和“删除所选 N 首”。底层 `useMusicPlayer` 新增 `removeSongs(songIds)`，会统一撤销 object URL、删除歌曲，并在删掉当前歌曲时选择下一首可用歌曲；如果歌单被删空则暂停并清空当前索引。
 
-视觉和上架准备方面，使用 `pic/3.png` 重新生成了纯白底 app icon、favicon 与 Android launcher/splash 资源，并将蓝色声波替换为 ColaOS 风格浅橙色。开屏图标背景已与外层纯白融合，避免原先图标与背景不和谐。上架文案草稿写入 `docs/store-listing-draft.md`，同时新增 `ProfilePanel` 作为“个人导航”模块，最初暂用 ASCII 草图和“公众号：待填写”占位，后续应替换为正式反馈入口。
+视觉和上架准备方面，使用 `pic/3.png` 重新生成了纯白底 app icon、favicon 与 Android launcher/splash 资源，并将蓝色声波替换为 ColaOS 风格浅橙色。开屏图标背景已与外层纯白融合，避免原先图标与背景不和谐。同时新增 `ProfilePanel` 作为“个人导航”模块，最初暂用 ASCII 草图和“公众号：待填写”占位，后续应替换为正式反馈入口。
 
 本轮新增/更新的测试覆盖点包括：手机端文件导入入口应为多选；不支持文件夹导入时按钮禁用；个人导航模块存在；单首删除取消确认时不删除；批量删除确认后删除所选歌曲；批量删除取消确认时保留歌曲；hook 层批量删除当前歌曲时保持后继歌曲可用。
 
@@ -314,3 +314,7 @@ CSS 色板回到 `#f9fafb` 页面、`#ffffff` 卡片、`#111827/#4b5563/#9ca3af`
 新增回归测试覆盖：打开“选择播放范围”后点击页面标题，`播放歌单` 浮层应从 DOM 中消失。验证结果：该测试先红后绿；`npm test -- --run` 6 个测试文件、41 条用例通过；`npm run build` 通过；`npm audit --audit-level=moderate` 返回 0 vulnerabilities。移动视口 `390x844` 用本机 Chrome + Playwright 构造 5 个歌单验证，整页 `clientWidth=390`、`scrollWidth=390`、`bodyScrollWidth=390`、`windowScrollX=0`；歌单条自身 `clientWidth=338`、`scrollWidth=636`、设置 `scrollLeft` 后能内部滑动；active tab 顶部在容器内可见，导入按钮显示“添加到：歌单三”。
 
 发布版本递增到 `versionCode=7`、`versionName=1.0.6`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.6-debug.apk`。APK 复查结果：`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。同步进 Android 的资源中已确认包含 `overscroll-behavior-x`、`playlist-tab-spacer`、`pointerdown` 和“选择播放范围”。本次 APK SHA256 为 `C99A8C8791F9C0CAAFE4B2E7ECD531642C6D32C785738E386331333660BCC8D0`。
+
+## 公开仓库文案收敛
+
+本轮复盘到一个边界问题：此前整理过的公开文案草稿不应跟随项目代码出现在 public GitHub 仓库。处理方式是从当前仓库版本删除该草稿文件，移除 README 中对该草稿的引用，并把 README 首页开头从产品宣传口径改回工程说明口径。GitHub 仓库 About 描述同步收敛为“自用 Android 本地音乐播放器项目”。

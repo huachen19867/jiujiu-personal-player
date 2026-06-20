@@ -1,6 +1,6 @@
 # 99新自用唱机
 
-本地音乐播放器。目标是替代臃肿在线音乐 App 的本地播放主线：用户在手机里多选音频文件，应用按歌单分组保存并播放。最终使用场景以手机端为准，桌面端只作为调试和补充适配。
+自用 Android 本地音乐播放器项目。主工程使用 Vite + React + TypeScript，手机安装包由 Capacitor Android 封装；桌面端只作为调试和补充适配。
 
 ## 快速进入
 
@@ -55,5 +55,4 @@ Android App 内选歌与播放已经优先走原生能力：多选使用 `ACTION
 - 设计说明：`docs/superpowers/specs/2026-06-14-local-music-pwa-design.md`
 - 实现计划：`docs/superpowers/plans/2026-06-14-local-music-pwa.md`
 - 发布说明：`docs/release-and-distribution.md`
-- 商店介绍草稿：`docs/store-listing-draft.md`
 - 技术日志：`docs/tech-log/tech-log.md`
