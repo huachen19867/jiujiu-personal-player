@@ -185,7 +185,7 @@ describe('useMusicPlayer', () => {
       pause: vi.fn().mockResolvedValue({}),
       seek: vi.fn().mockResolvedValue({}),
       setVolume: vi.fn().mockResolvedValue({}),
-      getState: vi.fn().mockResolvedValue({ currentTime: 0, duration: 199, isPlaying: true, ended: false }),
+      getState: vi.fn().mockResolvedValue({ currentTime: 0, duration: 199, isPlaying: false, ended: false }),
     };
     Object.defineProperty(globalThis, 'Capacitor', {
       configurable: true,
@@ -223,6 +223,47 @@ describe('useMusicPlayer', () => {
     );
     expect(nativePlayer.play).toHaveBeenCalled();
     expect(audioInstances[0].play).not.toHaveBeenCalled();
+    expect(result.current.duration).toBe(199);
+    expect(result.current.isPlaying).toBe(true);
+  });
+
+  it('resyncs UI state when native audio is still playing after the app resumes', async () => {
+    const nativePlayer = {
+      load: vi.fn().mockResolvedValue({ duration: 199 }),
+      play: vi.fn().mockResolvedValue({}),
+      pause: vi.fn().mockResolvedValue({}),
+      seek: vi.fn().mockResolvedValue({}),
+      setVolume: vi.fn().mockResolvedValue({}),
+      getState: vi.fn().mockResolvedValue({
+        currentTime: 37,
+        duration: 199,
+        isPlaying: true,
+        ended: false,
+        songId: 'native-one',
+        playlistId: 'playlist-1',
+        songIndex: 0,
+      }),
+      addListener: vi.fn(() => Promise.resolve({ remove: vi.fn() })),
+    };
+    Object.defineProperty(globalThis, 'Capacitor', {
+      configurable: true,
+      value: {
+        Plugins: {
+          NativeAudioPlayer: nativePlayer,
+        },
+      },
+    });
+    const { result } = renderHook(() => useMusicPlayer());
+
+    act(() => result.current.addSongs([makeNativeSong('native-one', 'Native One')]));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(nativePlayer.getState).toHaveBeenCalled();
+    expect(result.current.currentSong?.id).toBe('native-one');
+    expect(result.current.currentTime).toBe(37);
     expect(result.current.duration).toBe(199);
     expect(result.current.isPlaying).toBe(true);
   });

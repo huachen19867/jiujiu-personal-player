@@ -123,7 +123,6 @@ button:disabled {
 }
 
 .now-playing,
-.import-panel,
 .transport,
 .playlist-shell,
 .profile-panel {
@@ -143,8 +142,7 @@ button:disabled {
 .section-heading,
 .playlist-heading,
 .progress-row,
-.control-row,
-.import-panel {
+.control-row {
   display: flex;
   align-items: center;
 }
@@ -345,8 +343,7 @@ button:disabled {
 }
 
 .track-copy p,
-.song-main p,
-.notice {
+.song-main p {
   margin: 0;
   color: var(--text-secondary);
 }
@@ -525,7 +522,7 @@ button:disabled {
   min-height: 50px;
   flex: 0 0 clamp(104px, 31vw, 124px);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 26px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   padding: 0;
   border: 1px solid var(--border);
@@ -542,6 +539,10 @@ button:disabled {
   overflow: hidden;
 }
 
+.playlist-tab.has-actions {
+  grid-template-columns: minmax(0, 1fr) 28px 28px;
+}
+
 .playlist-tab:hover,
 .playlist-tab.is-active {
   border-color: rgba(244, 119, 42, 0.34);
@@ -551,7 +552,7 @@ button:disabled {
 }
 
 .playlist-tab-main,
-.playlist-tab-rename {
+.playlist-tab-action {
   min-width: 0;
   border: 0;
   background: transparent;
@@ -560,36 +561,41 @@ button:disabled {
 
 .playlist-tab-main {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto auto;
-  align-items: center;
-  column-gap: 6px;
+  align-content: center;
   row-gap: 1px;
-  padding: 8px 0 8px 12px;
+  padding: 8px 12px;
   text-align: left;
 }
 
-.playlist-tab-rename {
+.playlist-tab.has-actions .playlist-tab-main {
+  padding-right: 4px;
+}
+
+.playlist-tab-action {
+  position: relative;
   display: grid;
   place-items: center;
   padding: 0;
   color: var(--text-tertiary);
 }
 
-.playlist-tab-rename:hover {
+.playlist-tab-action:hover {
   background: rgba(244, 119, 42, 0.08);
   color: var(--accent);
 }
 
-.playlist-tab-main svg {
-  grid-row: 1 / span 2;
+.playlist-tab-add {
   color: var(--accent);
 }
 
-.playlist-tab-spacer {
-  width: 15px;
-  height: 15px;
-  grid-row: 1 / span 2;
+.playlist-tab-action input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .playlist-tab-main span,
@@ -611,89 +617,12 @@ button:disabled {
   font-weight: 700;
 }
 
-.import-panel {
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 14px;
-}
-
-.import-button {
-  min-height: 50px;
-  flex: 1 1 160px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 9px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text-primary);
-  font-weight: 800;
-  transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    color 160ms ease,
-    transform 160ms ease;
-}
-
-.import-button:hover {
-  border-color: rgba(244, 119, 42, 0.38);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-  transform: translateY(-1px);
-}
-
-.import-button:disabled {
-  cursor: not-allowed;
-  background: var(--surface-muted);
-  color: var(--text-tertiary);
-  transform: none;
-}
-
-.import-button:disabled svg {
-  color: var(--text-tertiary);
-}
-
-.import-button svg {
-  color: var(--accent);
-}
-
-.import-target,
-.import-caption {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.import-target {
-  font-size: 0.94rem;
-}
-
-.import-caption {
-  color: var(--text-secondary);
-  font-size: 0.76rem;
-  font-weight: 700;
-}
-
-.file-import {
-  position: relative;
-  cursor: pointer;
-}
-
-.file-import input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.notice {
+.playlist-switcher-notice {
   width: 100%;
-  min-height: 20px;
-  padding: 2px 2px 0;
+  margin: 8px 2px 0;
+  color: var(--text-secondary);
   font-size: 0.86rem;
+  line-height: 1.45;
 }
 
 .transport {
@@ -852,8 +781,7 @@ input[type='range'] {
   transform: translateY(-1px);
 }
 
-.feedback-entry-main,
-.feedback-copy {
+.feedback-entry-main {
   min-width: 0;
   display: inline-flex;
   align-items: center;
@@ -868,7 +796,7 @@ input[type='range'] {
 
 .feedback-detail {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 112px;
+  grid-template-columns: minmax(0, 1fr) 118px;
   align-items: center;
   gap: 14px;
   padding: 14px;
@@ -878,7 +806,11 @@ input[type='range'] {
 }
 
 .feedback-copy {
-  align-items: flex-start;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
 }
 
 .feedback-account {
@@ -898,8 +830,25 @@ input[type='range'] {
   font-size: 1rem;
 }
 
+.feedback-copy-button {
+  grid-column: 2;
+  width: max-content;
+}
+
+.feedback-qr-button {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .feedback-qr {
-  width: 112px;
+  width: 118px;
   aspect-ratio: 1;
   display: block;
   border: 1px solid var(--border);
@@ -946,6 +895,13 @@ input[type='range'] {
   white-space: nowrap;
 }
 
+.feedback-manual-copy {
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.feedback-copy-button,
 .feedback-github button {
   min-height: 32px;
   display: inline-flex;
@@ -957,6 +913,46 @@ input[type='range'] {
   background: #ffffff;
   color: var(--accent-strong);
   font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.feedback-qr-modal {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(17, 24, 39, 0.48);
+}
+
+.feedback-qr-modal button {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.52);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
+}
+
+.feedback-qr-modal img {
+  width: min(78vw, 360px);
+  aspect-ratio: 1;
+  border: 8px solid #ffffff;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(17, 24, 39, 0.28);
+}
+
+.feedback-qr-modal p {
+  margin: 14px 0 0;
+  color: #ffffff;
+  font-size: 0.92rem;
   font-weight: 800;
 }
 
@@ -1249,10 +1245,6 @@ input:focus-visible {
 
   .playlist-switcher {
     padding: 8px 12px 10px;
-  }
-
-  .import-panel {
-    padding: 12px;
   }
 
   .utility-row {

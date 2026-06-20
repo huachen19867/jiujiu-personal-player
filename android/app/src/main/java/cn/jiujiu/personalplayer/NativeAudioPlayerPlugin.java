@@ -158,6 +158,7 @@ public class NativeAudioPlayerPlugin extends Plugin {
     public void release(PluginCall call) {
         releaseCurrentPlayer();
         cancelMediaNotification();
+        stopPlaybackService();
         call.resolve();
     }
 
@@ -165,6 +166,7 @@ public class NativeAudioPlayerPlugin extends Plugin {
     protected void handleOnDestroy() {
         releaseCurrentPlayer();
         cancelMediaNotification();
+        stopPlaybackService();
         unregisterCommandReceiver();
         if (mediaSession != null) {
             mediaSession.setActive(false);
@@ -183,6 +185,7 @@ public class NativeAudioPlayerPlugin extends Plugin {
             ended = false;
         }
         mediaPlayer.start();
+        startPlaybackService();
         updateMediaSession(true);
         showMediaNotification(true);
         if (emitEvent) {
@@ -196,6 +199,7 @@ public class NativeAudioPlayerPlugin extends Plugin {
         }
         updateMediaSession(false);
         showMediaNotification(false);
+        stopPlaybackService();
         if (emitEvent) {
             notifyPlaybackEvent("pause");
         }
@@ -226,12 +230,16 @@ public class NativeAudioPlayerPlugin extends Plugin {
             ended = true;
             updateMediaSession(false);
             showMediaNotification(false);
+            stopPlaybackService();
             notifyPlaybackEvent("ended");
         });
         mediaPlayer.prepare();
         ended = false;
         if (shouldPlay) {
             mediaPlayer.start();
+            startPlaybackService();
+        } else {
+            stopPlaybackService();
         }
         updateMediaSession(shouldPlay);
         showMediaNotification(shouldPlay);
@@ -379,6 +387,30 @@ public class NativeAudioPlayerPlugin extends Plugin {
                 )
                 .build()
         );
+    }
+
+    private void startPlaybackService() {
+        Intent intent = new Intent(getContext(), PlaybackForegroundService.class);
+        intent.putExtra(PlaybackForegroundService.EXTRA_TITLE, currentTitle);
+        intent.putExtra(PlaybackForegroundService.EXTRA_PLAYLIST, currentPlaylist);
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                getContext().startForegroundService(intent);
+            } else {
+                getContext().startService(intent);
+            }
+        } catch (IllegalStateException | SecurityException ignored) {
+            // The media session can still play; the web layer will surface playback failures separately.
+        }
+    }
+
+    private void stopPlaybackService() {
+        try {
+            getContext().stopService(new Intent(getContext(), PlaybackForegroundService.class));
+        } catch (IllegalStateException | SecurityException ignored) {
+            // Nothing to stop, or the platform refused the service transition.
+        }
     }
 
     private void showMediaNotification(boolean isPlaying) {

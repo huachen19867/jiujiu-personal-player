@@ -401,7 +401,7 @@ export function useMusicPlayer() {
   ]);
 
   useEffect(() => {
-    if (!currentSong?.nativeUri || !nativeAudioPlayer || !isPlaying) {
+    if (!currentSong?.nativeUri || !nativeAudioPlayer) {
       return;
     }
 
@@ -417,6 +417,7 @@ export function useMusicPlayer() {
         if (!trackChanged) {
           setCurrentTime(state.currentTime);
           setDuration(state.duration);
+          setIsPlaying(state.isPlaying);
         }
         if (state.ended) {
           advanceAfterTrackEnd();
@@ -434,7 +435,7 @@ export function useMusicPlayer() {
       canceled = true;
       window.clearInterval(timer);
     };
-  }, [advanceAfterTrackEnd, currentSong?.nativeUri, isPlaying, nativeAudioPlayer, syncNativeTrackState]);
+  }, [advanceAfterTrackEnd, currentSong?.nativeUri, nativeAudioPlayer, syncNativeTrackState]);
 
   useEffect(() => {
     if (!nativeAudioPlayer?.addListener) {

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { ImportActions } from './components/ImportActions';
 import { NowPlaying } from './components/NowPlaying';
 import { Playlist } from './components/Playlist';
 import { PlaylistSwitcher } from './components/PlaylistSwitcher';
@@ -96,16 +95,12 @@ function App() {
             <PlaylistSwitcher
               playlists={player.playlistGroups}
               activePlaylistId={player.activePlaylistId}
-              onSelectPlaylist={player.selectPlaylist}
-              onRenamePlaylist={player.renamePlaylist}
-            />
-
-            <ImportActions
               notice={notice ?? player.errorMessage ?? reauthorizationNotice}
-              targetPlaylistName={player.activePlaylistName}
               nativeAudioImportSupported={nativeAudioImportSupported}
               onFilesSelected={addFiles}
               onNativeAudioImport={importNativeAudio}
+              onSelectPlaylist={player.selectPlaylist}
+              onRenamePlaylist={player.renamePlaylist}
             />
           </div>
 
