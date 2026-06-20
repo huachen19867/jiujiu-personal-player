@@ -18,6 +18,19 @@ function fileInputFor(playlistName = '歌单一') {
   return screen.getByLabelText(`给${playlistName}添加歌曲`);
 }
 
+async function revealPlaylistActions(user: ReturnType<typeof userEvent.setup>, playlistName = '歌单一') {
+  await user.click(screen.getByRole('button', { name: `查看 ${playlistName}` }));
+}
+
+async function uploadFilesToPlaylist(
+  user: ReturnType<typeof userEvent.setup>,
+  files: File[],
+  playlistName = '歌单一',
+) {
+  await revealPlaylistActions(user, playlistName);
+  await user.upload(fileInputFor(playlistName), files);
+}
+
 describe('App', () => {
   beforeEach(() => {
     vi.stubGlobal('Audio', FakeAudio);
@@ -41,7 +54,8 @@ describe('App', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the empty-state local import actions', () => {
+  it('renders the empty-state local import actions', async () => {
+    const user = userEvent.setup();
     render(<App />);
 
     expect(screen.getByText('99新自用唱机')).toBeInTheDocument();
@@ -49,6 +63,11 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: '查看 歌单一' })).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: '本地导入' })).not.toBeInTheDocument();
     expect(screen.queryByText(/添加到：/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('给歌单一添加歌曲')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '重命名 歌单一' })).not.toBeInTheDocument();
+
+    await revealPlaylistActions(user);
+
     expect(screen.getByLabelText('给歌单一添加歌曲')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '重命名 歌单一' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /文件夹导入/ })).not.toBeInTheDocument();
@@ -64,6 +83,21 @@ describe('App', () => {
         .compareDocumentPosition(screen.getByRole('region', { name: '歌单切换' })) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it('hides playlist actions after tapping outside the switcher', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await revealPlaylistActions(user);
+    expect(screen.getByLabelText('给歌单一添加歌曲')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '重命名 歌单一' })).toBeInTheDocument();
+
+    await user.click(screen.getByText('99新自用唱机'));
+
+    expect(screen.queryByLabelText('给歌单一添加歌曲')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '重命名 歌单一' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查看 歌单一' })).toBeInTheDocument();
   });
 
   it('opens the feedback contact card from the bottom profile panel', async () => {
@@ -144,7 +178,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.upload(fileInputFor('歌单一'), [
+    await uploadFilesToPlaylist(user, [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
       new File(['text'], 'notes.txt', { type: 'text/plain' }),
       new File(['audio'], 'Late Night.flac', { type: '' }),
@@ -187,6 +221,7 @@ describe('App', () => {
 
     render(<App />);
 
+    await revealPlaylistActions(user);
     await user.click(screen.getByRole('button', { name: '给歌单一添加歌曲' }));
 
     expect(pickAudioFiles).toHaveBeenCalled();
@@ -233,6 +268,7 @@ describe('App', () => {
 
     render(<App />);
 
+    await revealPlaylistActions(user);
     await user.click(screen.getByRole('button', { name: '给歌单一添加歌曲' }));
     expect(await screen.findByRole('heading', { name: '歌单一：1 首歌' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '查看 歌单二' })).toBeInTheDocument();
@@ -263,7 +299,7 @@ describe('App', () => {
     const prompt = vi.spyOn(window, 'prompt').mockReturnValue('古风');
     render(<App />);
 
-    await user.upload(fileInputFor('歌单一'), [
+    await uploadFilesToPlaylist(user, [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
     ]);
     await user.click(screen.getByRole('button', { name: '重命名 歌单一' }));
@@ -278,7 +314,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.upload(fileInputFor('歌单一'), [
+    await uploadFilesToPlaylist(user, [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
     ]);
 
@@ -329,6 +365,7 @@ describe('App', () => {
 
     render(<App />);
 
+    await revealPlaylistActions(user);
     await user.click(screen.getByRole('button', { name: '给歌单一添加歌曲' }));
     await user.click(screen.getByRole('button', { name: '播放' }));
     expect(await screen.findByText('正在播放 歌单一')).toBeInTheDocument();
@@ -349,7 +386,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.upload(fileInputFor('歌单一'), [
+    await uploadFilesToPlaylist(user, [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
     ]);
 
@@ -365,7 +402,7 @@ describe('App', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.upload(fileInputFor('歌单一'), [
+    await uploadFilesToPlaylist(user, [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
     ]);
 
@@ -382,7 +419,7 @@ describe('App', () => {
     expect(container.querySelector('.disc-play-mark')).toBeInTheDocument();
     expect(container.querySelector('.disc-pause-mark')).not.toBeInTheDocument();
 
-    await user.upload(fileInputFor('歌单一'), [
+    await uploadFilesToPlaylist(user, [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
     ]);
 
@@ -408,7 +445,7 @@ describe('App', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<App />);
 
-    await user.upload(fileInputFor('歌单一'), [
+    await uploadFilesToPlaylist(user, [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
       new File(['audio'], 'Late Night.flac', { type: '' }),
     ]);
@@ -431,7 +468,7 @@ describe('App', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<App />);
 
-    await user.upload(fileInputFor('歌单一'), [
+    await uploadFilesToPlaylist(user, [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
       new File(['audio'], 'Late Night.flac', { type: '' }),
       new File(['audio'], 'Third Song.wav', { type: 'audio/wav' }),
@@ -454,7 +491,7 @@ describe('App', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<App />);
 
-    await user.upload(fileInputFor('歌单一'), [
+    await uploadFilesToPlaylist(user, [
       new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
       new File(['audio'], 'Late Night.flac', { type: '' }),
     ]);

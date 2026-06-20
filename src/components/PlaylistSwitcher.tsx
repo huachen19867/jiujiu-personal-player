@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Pencil, Plus } from 'lucide-react';
 import type { PlaylistGroup } from '../types/music';
 
@@ -22,24 +23,77 @@ export function PlaylistSwitcher({
   onSelectPlaylist,
   onRenamePlaylist,
 }: PlaylistSwitcherProps) {
+  const rootRef = useRef<HTMLElement>(null);
+  const [actionPlaylistId, setActionPlaylistId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!actionPlaylistId) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (rootRef.current?.contains(event.target as Node)) {
+        return;
+      }
+
+      setActionPlaylistId(null);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setActionPlaylistId(null);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [actionPlaylistId]);
+
+  useEffect(() => {
+    if (actionPlaylistId && !playlists.some((playlist) => playlist.id === actionPlaylistId)) {
+      setActionPlaylistId(null);
+    }
+  }, [actionPlaylistId, playlists]);
+
   return (
-    <section className="playlist-switcher" aria-label="歌单切换">
+    <section className="playlist-switcher" aria-label="歌单切换" ref={rootRef}>
       <div className="playlist-switcher-track">
         {playlists.map((playlist) => {
           const isActive = playlist.id === activePlaylistId;
+          const isActionOpen = playlist.id === actionPlaylistId;
+          const className = [
+            'playlist-tab',
+            isActive ? 'is-active' : '',
+            isActionOpen ? 'has-actions' : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
+
           return (
-            <div className={isActive ? 'playlist-tab is-active has-actions' : 'playlist-tab'} key={playlist.id}>
+            <div className={className} key={playlist.id}>
               <button
                 className="playlist-tab-main"
                 type="button"
                 aria-label={`查看 ${playlist.name}`}
-                onClick={() => onSelectPlaylist(playlist.id)}
+                aria-expanded={isActionOpen}
+                onClick={() => {
+                  if (!isActive) {
+                    onSelectPlaylist(playlist.id);
+                  }
+
+                  setActionPlaylistId(isActionOpen ? null : playlist.id);
+                }}
               >
                 <span>{playlist.name}</span>
                 <small>{playlist.songs.length} 首</small>
               </button>
 
-              {isActive ? (
+              {isActionOpen ? (
                 nativeAudioImportSupported ? (
                   <button
                     className="playlist-tab-action playlist-tab-add"
@@ -68,7 +122,7 @@ export function PlaylistSwitcher({
                 )
               ) : null}
 
-              {isActive ? (
+              {isActionOpen ? (
                 <button
                   className="playlist-tab-action playlist-tab-rename"
                   type="button"

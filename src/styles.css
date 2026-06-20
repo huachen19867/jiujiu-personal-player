@@ -11,6 +11,9 @@
   --accent-muted: #f8b17a;
   --border: #e5e7eb;
   --border-strong: #111827;
+  --surface-glass: rgba(255, 255, 255, 0.82);
+  --surface-glass-strong: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(255, 255, 255, 0.72);
   --danger: #dc2626;
   --shadow-card: 0 1px 2px rgba(17, 24, 39, 0.04), 0 12px 28px rgba(17, 24, 39, 0.06);
   --shadow-hover: 0 18px 38px rgba(17, 24, 39, 0.1);
@@ -128,8 +131,10 @@ button:disabled {
 .profile-panel {
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--surface);
+  background: linear-gradient(180deg, var(--surface-glass-strong), var(--surface-glass));
   box-shadow: var(--shadow-card);
+  backdrop-filter: blur(18px) saturate(1.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
 }
 
 .now-playing {
@@ -495,6 +500,12 @@ button:disabled {
   max-width: 100%;
   min-width: 0;
   padding: 12px 14px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.58);
+  box-shadow: 0 14px 34px rgba(17, 24, 39, 0.055);
+  backdrop-filter: blur(18px) saturate(1.12);
+  -webkit-backdrop-filter: blur(18px) saturate(1.12);
   overflow: hidden;
 }
 
@@ -520,33 +531,37 @@ button:disabled {
 .playlist-tab {
   min-width: 0;
   min-height: 50px;
-  flex: 0 0 clamp(104px, 31vw, 124px);
+  flex: 0 0 clamp(108px, 31vw, 128px);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.74);
   color: var(--text-secondary);
   text-align: left;
   transition:
     border-color 160ms ease,
     background-color 160ms ease,
     color 160ms ease,
+    flex-basis 160ms ease,
     box-shadow 160ms ease;
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
   scroll-snap-align: start;
   overflow: hidden;
 }
 
 .playlist-tab.has-actions {
+  flex-basis: clamp(156px, 44vw, 178px);
   grid-template-columns: minmax(0, 1fr) 28px 28px;
 }
 
 .playlist-tab:hover,
 .playlist-tab.is-active {
   border-color: rgba(244, 119, 42, 0.34);
-  background: var(--accent-soft);
+  background: rgba(255, 243, 232, 0.78);
   color: var(--accent-strong);
   box-shadow: inset 0 0 0 1px rgba(244, 119, 42, 0.1);
 }
@@ -568,7 +583,7 @@ button:disabled {
 }
 
 .playlist-tab.has-actions .playlist-tab-main {
-  padding-right: 4px;
+  padding-right: 6px;
 }
 
 .playlist-tab-action {

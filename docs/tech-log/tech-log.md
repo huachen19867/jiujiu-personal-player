@@ -358,3 +358,15 @@ UI 结构上，`PlaylistSwitcher` 现在同时承担“查看/导入目标歌单
 后台播放的根因分两层：`1.0.8` 已经把队列和锁屏下一首交给原生层，但还没有前台服务，Android 仍可能在锁屏/后台一段时间后降低进程优先级；前端同步逻辑又只在 `isPlaying=true` 时轮询 `NativeAudioPlayer.getState()`，所以一旦 React 状态误以为暂停，就不会再从原生播放器纠正回来。现在 Android 侧新增 `PlaybackForegroundService`，声明 `FOREGROUND_SERVICE` 和 `FOREGROUND_SERVICE_MEDIA_PLAYBACK` 权限，并在原生播放开始时启动 `mediaPlayback` 前台服务、暂停/结束/释放时停止；前端则只要当前曲目是 `nativeUri` 就持续同步原生状态，避免“显示暂停，实则播放”。
 
 发布版本递增到 `versionCode=10`、`versionName=1.0.9`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.9-debug.apk`。验证结果：先红后绿的定向测试通过；`npm test -- --run` 6 个测试文件、50 条用例通过；`npm run build` 通过；`npm run android:apk` 通过并完成 Capacitor sync 与 Gradle `assembleDebug`；`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、`versionCode=10`、`versionName=1.0.9`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过；`aapt dump permissions` 确认 APK 包含 `WAKE_LOCK`、`FOREGROUND_SERVICE`、`FOREGROUND_SERVICE_MEDIA_PLAYBACK` 和 `POST_NOTIFICATIONS`。移动视口 `390x844` Playwright 冒烟检查显示 `bodyScrollWidth=390`、`clientWidth=390`，无横向溢出；检查图保存为 `C:\AI\Android\jiujiu-player-v1.0.9-mobile-check.png` 和 `C:\AI\Android\jiujiu-player-v1.0.9-feedback-check.png`。本次 APK SHA256 为 `40AD6D550F80D006F783CE4608A93A4F992EF291CFA1139EF0BA92D583E98044`。
+
+## 歌单操作态收起与轻毛玻璃质感
+
+本轮真机截图暴露出一个 UI 语义问题：`PlaylistSwitcher` 把“当前查看的歌单”和“正在操作的歌单”混成同一个状态，所以当前歌单卡片会永久显示加号和重命名笔。手机宽度下三个字的“歌单一”也会被这两个操作入口挤到省略号。处理方式是拆出 `actionPlaylistId`：`activePlaylistId` 仍表示当前查看/导入目标，`actionPlaylistId` 只表示临时操作态。点击歌单卡片会显示该歌单的加号和笔；点击页面外部或按 Escape 会收起；收起后歌单仍保持选中，只是不再把操作按钮常驻在卡片里。
+
+测试先补红灯再改实现：`App.test.tsx` 现在断言空状态下不会默认渲染“给歌单一添加歌曲”和“重命名 歌单一”，点击“查看 歌单一”后才出现；新增“点击歌单切换条外部后隐藏歌单操作按钮”的回归用例。由于导入入口从常驻变为临时操作态，测试里的文件上传 helper 也统一先触发歌单操作态，避免以后误以为隐藏的 input 仍可直接使用。
+
+视觉上只做轻量高级化，不改回重色系。卡片和歌单切换条改为半透明白底、细边和 `backdrop-filter`，歌单 tab 常态保持完整文字宽度，操作态才在横向滚动条内部适度变宽，避免撑开整页。这个边界很重要：毛玻璃只服务层次和触感，不能变成大面积装饰，也不能让移动端布局重新横向溢出。
+
+验证结果：`npm test -- --run src/App.test.tsx -t "hides playlist actions"` 先失败后通过；`npm test -- --run src/App.test.tsx` 17 条通过；`npm test -- --run` 6 个测试文件、51 条用例通过；`npm run build` 通过；`npm audit --audit-level=moderate` 返回 0 vulnerabilities。移动视口 `390x844` 浏览器验证显示常态 `addVisible=false`、`renameVisible=false`，点击歌单后 `addVisible=true`、`renameVisible=true`，点页面标题后两者恢复为 `false`；`bodyScrollWidth=375`、`docClientWidth=375`，无横向溢出，歌单切换条计算出的 `backdrop-filter` 为 `blur(18px) saturate(1.12)`。
+
+发布版本递增到 `versionCode=11`、`versionName=1.0.10`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.10-debug.apk`。APK 复查结果：`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`versionCode=11`、`versionName=1.0.10`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。本次 APK SHA256 为 `F7D5C6A14FC7FF11C433F3F68735EC1937258A747BB3473772B8EEE8113CB660`。
