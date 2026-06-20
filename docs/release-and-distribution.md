@@ -25,7 +25,7 @@ cn.jiujiu.personalplayer
 
 ```text
 C:\AI\Android\jiujiu-personal-player-debug.apk
-C:\AI\Android\jiujiu-personal-player-v1.0.5-debug.apk
+C:\AI\Android\jiujiu-personal-player-v1.0.6-debug.apk
 ```
 
 本地生成命令：
@@ -36,7 +36,7 @@ npm run android:apk
 
 注意：当前是 debug 签名包，适合发给自己或朋友测试。真正上架应用商店时，需要做 release 签名，并且长期保存签名文件；签名丢了，以后就没法给同一个应用正常升级。
 
-Android 覆盖升级依赖同一个包名、同一套签名，并且建议递增 `versionCode`。`1.0.0` 的测试包使用 `versionCode=1`；`1.0.1` 升到 `versionCode=2`；`1.0.2` 升到 `versionCode=3`；`1.0.3` 升到 `versionCode=4`；`1.0.4` 升到 `versionCode=5`；`1.0.5` 升到 `versionCode=6`。如果手机浏览器缓存了旧 APK，优先下载带版本号的文件名。
+Android 覆盖升级依赖同一个包名、同一套签名，并且建议递增 `versionCode`。`1.0.0` 的测试包使用 `versionCode=1`；`1.0.1` 升到 `versionCode=2`；`1.0.2` 升到 `versionCode=3`；`1.0.3` 升到 `versionCode=4`；`1.0.4` 升到 `versionCode=5`；`1.0.5` 升到 `versionCode=6`；`1.0.6` 升到 `versionCode=7`。如果手机浏览器缓存了旧 APK，优先下载带版本号的文件名。
 
 ## 热更新判断
 

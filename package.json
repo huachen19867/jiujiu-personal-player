@@ -11,7 +11,7 @@
     "android:sync": "npm run build && cap sync android",
     "android:open": "cap open android",
     "android:apk": "set \"JAVA_HOME=C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.11.10-hotspot\" && set \"ANDROID_HOME=C:\\AI\\Android\\sdk\" && set \"PATH=%JAVA_HOME%\\bin;%ANDROID_HOME%\\platform-tools;%PATH%\" && npm run android:sync && cd android && gradlew.bat assembleDebug && cd .. && npm run android:copy-apk",
-    "android:copy-apk": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"New-Item -ItemType Directory -Force 'C:\\AI\\Android' | Out-Null; Copy-Item -LiteralPath 'android\\app\\build\\outputs\\apk\\debug\\app-debug.apk' -Destination 'C:\\AI\\Android\\jiujiu-personal-player-debug.apk' -Force; Copy-Item -LiteralPath 'android\\app\\build\\outputs\\apk\\debug\\app-debug.apk' -Destination 'C:\\AI\\Android\\jiujiu-personal-player-v1.0.5-debug.apk' -Force\""
+    "android:copy-apk": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"New-Item -ItemType Directory -Force 'C:\\AI\\Android' | Out-Null; Copy-Item -LiteralPath 'android\\app\\build\\outputs\\apk\\debug\\app-debug.apk' -Destination 'C:\\AI\\Android\\jiujiu-personal-player-debug.apk' -Force; Copy-Item -LiteralPath 'android\\app\\build\\outputs\\apk\\debug\\app-debug.apk' -Destination 'C:\\AI\\Android\\jiujiu-personal-player-v1.0.6-debug.apk' -Force\""
   },
   "dependencies": {
     "@capacitor/android": "^8.4.0",

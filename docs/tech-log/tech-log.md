@@ -304,3 +304,13 @@ CSS 色板回到 `#f9fafb` 页面、`#ffffff` 卡片、`#111827/#4b5563/#9ca3af`
 验证结果：`npm test -- --run src/App.test.tsx` 13 条用例通过；`npm test -- --run` 6 个测试文件、40 条用例通过；`npm run build` 通过；`npm audit --audit-level=moderate` 返回 0 vulnerabilities。移动视口 `390x844` 用本机 Chrome + Playwright 冒烟检查，`clientWidth=390`、`scrollWidth=390`，新切换条可见，导入按钮显示“添加到：歌单一”，没有横向溢出。
 
 发布版本递增到 `versionCode=6`、`versionName=1.0.5`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.5-debug.apk`。APK 复查结果：`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。同步进 Android 的资源中已确认包含“歌单切换”“添加到：歌单一”“选择播放范围”，没有旧的“选择播放歌单”。本次 APK SHA256 为 `F1B6E71BB5A281851AD0B74019295E57F95428A8AEF60E81D782F5CD28D5A335`。
+
+## 手机端歌单浮层与横向溢出修正
+
+本轮来自真机截图反馈：播放范围浮层打开后点屏幕其它区域不会收起；歌单切换条的高亮 tab 顶部被裁；歌单数量增多后页面整体被横向撑开，用户能把整个播放器拖到屏幕外。根因分别是：`NowPlaying` 只在触发按钮上切换 `playlistMenuOpen`，没有外部点击监听；`.playlist-tab.is-active` 使用 `translateY(-1px)`，而横向滚动容器会裁剪纵向溢出；`.playlist-switcher-track` 缺少外层宽度封顶和页面级横向溢出保护，部分 WebView 会把内部滚动宽度算进整页宽度。
+
+处理方式：`NowPlaying` 增加 `playlistPickerRef`，菜单打开时监听 `document.pointerdown` 和 `Escape`，点击浮层外部或按 Esc 即关闭，点击复选框和按钮内部不受影响。歌单切换条去掉高亮态的垂直位移，改为边框和 inset shadow 表示选中；外层 `.playlist-switcher` 设定 `width/max-width/min-width` 与 `overflow: hidden`，内层 `.playlist-switcher-track` 固定为自身横向滚动，启用 `overscroll-behavior-x: contain` 和 `-webkit-overflow-scrolling: touch`，并给 tab 使用固定响应式 flex 宽度，确保新增歌单只增加内部横滑距离，不改变页面布局。
+
+新增回归测试覆盖：打开“选择播放范围”后点击页面标题，`播放歌单` 浮层应从 DOM 中消失。验证结果：该测试先红后绿；`npm test -- --run` 6 个测试文件、41 条用例通过；`npm run build` 通过；`npm audit --audit-level=moderate` 返回 0 vulnerabilities。移动视口 `390x844` 用本机 Chrome + Playwright 构造 5 个歌单验证，整页 `clientWidth=390`、`scrollWidth=390`、`bodyScrollWidth=390`、`windowScrollX=0`；歌单条自身 `clientWidth=338`、`scrollWidth=636`、设置 `scrollLeft` 后能内部滑动；active tab 顶部在容器内可见，导入按钮显示“添加到：歌单三”。
+
+发布版本递增到 `versionCode=7`、`versionName=1.0.6`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.6-debug.apk`。APK 复查结果：`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。同步进 Android 的资源中已确认包含 `overscroll-behavior-x`、`playlist-tab-spacer`、`pointerdown` 和“选择播放范围”。本次 APK SHA256 为 `C99A8C8791F9C0CAAFE4B2E7ECD531642C6D32C785738E386331333660BCC8D0`。

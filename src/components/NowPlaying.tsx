@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import type { PlaylistGroup, Song } from '../types/music';
 import { formatDuration } from '../lib/format';
@@ -76,7 +76,32 @@ export function NowPlaying({
 }: NowPlayingProps) {
   const isDiscActive = Boolean(song && isPlaying);
   const [playlistMenuOpen, setPlaylistMenuOpen] = useState(false);
+  const playlistPickerRef = useRef<HTMLDivElement>(null);
   const playbackPrefix = song ? (isPlaying ? '正在播放' : '已暂停') : '还没有开始';
+
+  useEffect(() => {
+    if (!playlistMenuOpen) {
+      return;
+    }
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!playlistPickerRef.current?.contains(event.target as Node)) {
+        setPlaylistMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setPlaylistMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [playlistMenuOpen]);
 
   return (
     <section className="now-playing" aria-label="当前播放">
@@ -94,7 +119,7 @@ export function NowPlaying({
         </div>
 
         <div className="track-copy">
-          <div className="track-playlist-picker">
+          <div className="track-playlist-picker" ref={playlistPickerRef}>
             <button
               className="playlist-picker-trigger"
               type="button"

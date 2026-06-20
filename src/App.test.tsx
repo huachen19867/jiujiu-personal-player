@@ -279,6 +279,22 @@ describe('App', () => {
     expect(screen.getByRole('checkbox', { name: '纳入播放 歌单二' })).toBeChecked();
   });
 
+  it('closes the playback range menu after tapping outside it', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.upload(screen.getByLabelText('添加到：歌单一，选歌，可多选'), [
+      new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
+    ]);
+
+    await user.click(screen.getByRole('button', { name: '选择播放范围' }));
+    expect(screen.getByRole('group', { name: '播放歌单' })).toBeInTheDocument();
+
+    await user.click(screen.getByText('99新自用唱机'));
+
+    expect(screen.queryByRole('group', { name: '播放歌单' })).not.toBeInTheDocument();
+  });
+
   it('cycles playback mode from the transport controls', async () => {
     const user = userEvent.setup();
     render(<App />);
