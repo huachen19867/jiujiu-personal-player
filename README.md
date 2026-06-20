@@ -33,7 +33,7 @@ npm run android:apk
 当前调试 APK 会复制到两个位置：
 
 - `C:\AI\Android\jiujiu-personal-player-debug.apk`
-- `C:\AI\Android\jiujiu-personal-player-v1.0.7-debug.apk`
+- `C:\AI\Android\jiujiu-personal-player-v1.0.8-debug.apk`
 
 优先把带版本号的文件发到 Android 手机，允许“安装未知来源应用”即可安装打开。后续每次发包都要递增 Android `versionCode`，否则部分手机可能不会把新包稳定识别为覆盖升级。
 
@@ -52,7 +52,7 @@ npm run android:apk
 
 ## 已知边界
 
-Android App 内选歌与播放已经优先走原生能力：多选使用 `ACTION_OPEN_DOCUMENT`，播放使用 Android `MediaPlayer`，并接入基础 `MediaSession` 媒体通知，播放时可在通知栏和锁屏显示曲名与播放控制。如果应用被系统强杀或从任务列表划掉，后台播放仍可能停止；更完整的前台服务化可作为后续增强。
+Android App 内选歌与播放已经优先走原生能力：多选使用 `ACTION_OPEN_DOCUMENT`，播放使用 Android `MediaPlayer`，并接入基础 `MediaSession` 媒体通知。当前前端会把播放范围里的原生音频队列同步给 Android 层，因此后台播完当前曲目、或锁屏点下一首时，原生层可以直接加载下一首并继续播放。如果应用被系统强杀或从任务列表划掉，后台播放仍可能停止；更完整的前台服务化可作为后续增强。
 
 ## 项目记录
 

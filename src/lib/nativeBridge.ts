@@ -4,29 +4,67 @@ export interface NativeMusicPickerPlugin {
   pickAudioFiles: () => Promise<{ songs: NativeAudioAsset[] }>;
 }
 
+export interface NativeAudioQueueItem {
+  songId: string;
+  playlistId: string;
+  songIndex: number;
+  uri: string;
+  title: string;
+  playlist: string;
+  duration?: number;
+}
+
 export interface NativeAudioPlayerState {
   currentTime: number;
   duration: number;
   isPlaying: boolean;
   ended: boolean;
+  songId?: string;
+  playlistId?: string;
+  songIndex?: number;
 }
 
 export interface NativePluginListenerHandle {
   remove: () => Promise<void> | void;
 }
 
-export type NativeAudioPlayerEvent = 'ended' | 'next' | 'previous' | 'play' | 'pause';
+export type NativeAudioPlayerEvent = 'ended' | 'next' | 'previous' | 'play' | 'pause' | 'trackChanged';
+
+export interface NativeAudioPlayerEventPayload {
+  currentTime?: number;
+  duration?: number;
+  isPlaying?: boolean;
+  songId?: string;
+  playlistId?: string;
+  songIndex?: number;
+}
 
 export interface NativeAudioPlayerPlugin {
-  load: (options: { uri: string; volume: number; title?: string; playlist?: string }) => Promise<{ duration: number }>;
+  load: (options: {
+    uri: string;
+    volume: number;
+    title?: string;
+    playlist?: string;
+    songId?: string;
+    playlistId?: string;
+    songIndex?: number;
+    queue?: NativeAudioQueueItem[];
+    queueIndex?: number;
+    playbackMode?: string;
+  }) => Promise<{ duration: number }>;
   play: () => Promise<void>;
   pause: () => Promise<void>;
   seek: (options: { position: number }) => Promise<void>;
   setVolume: (options: { volume: number }) => Promise<void>;
+  setQueue?: (options: {
+    queue: NativeAudioQueueItem[];
+    queueIndex: number;
+    playbackMode: string;
+  }) => Promise<void>;
   getState: () => Promise<NativeAudioPlayerState>;
   addListener?: (
     eventName: NativeAudioPlayerEvent,
-    listener: () => void,
+    listener: (event?: NativeAudioPlayerEventPayload) => void,
   ) => Promise<NativePluginListenerHandle> | NativePluginListenerHandle;
   release?: () => Promise<void>;
 }

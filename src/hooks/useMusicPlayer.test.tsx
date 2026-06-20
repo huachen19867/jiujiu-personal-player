@@ -43,6 +43,18 @@ function makeSong(id: string, name = id): Song {
   };
 }
 
+function makeNativeSong(id: string, name = id): Song {
+  return {
+    id,
+    name,
+    type: 'audio/mpeg',
+    size: 1024,
+    url: `content://media/audio/${id}`,
+    nativeUri: `content://media/audio/${id}`,
+    source: 'android-native',
+  };
+}
+
 describe('useMusicPlayer', () => {
   beforeEach(() => {
     audioInstances.length = 0;
@@ -289,6 +301,123 @@ describe('useMusicPlayer', () => {
     expect(nativePlayer.play).toHaveBeenCalled();
   });
 
+  it('syncs the native playback queue when playback range changes', async () => {
+    const nativePlayer = {
+      load: vi.fn().mockResolvedValue({ duration: 199 }),
+      play: vi.fn().mockResolvedValue({}),
+      pause: vi.fn().mockResolvedValue({}),
+      seek: vi.fn().mockResolvedValue({}),
+      setVolume: vi.fn().mockResolvedValue({}),
+      setQueue: vi.fn().mockResolvedValue({}),
+      getState: vi.fn().mockResolvedValue({ currentTime: 0, duration: 199, isPlaying: true, ended: false }),
+      addListener: vi.fn(() => Promise.resolve({ remove: vi.fn() })),
+    };
+    Object.defineProperty(globalThis, 'Capacitor', {
+      configurable: true,
+      value: {
+        Plugins: {
+          NativeAudioPlayer: nativePlayer,
+        },
+      },
+    });
+    const { result } = renderHook(() => useMusicPlayer());
+
+    act(() => result.current.addSongs([makeNativeSong('one')]));
+    act(() => result.current.selectPlaylist('playlist-2'));
+    act(() => result.current.addSongs([makeNativeSong('two')]));
+    await act(async () => {
+      await result.current.togglePlay();
+      await Promise.resolve();
+    });
+    nativePlayer.setQueue.mockClear();
+
+    act(() => result.current.togglePlaybackPlaylist('playlist-2'));
+    act(() => result.current.togglePlaybackPlaylist('playlist-1'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(nativePlayer.setQueue).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        queueIndex: 0,
+        playbackMode: 'sequence',
+        queue: [
+          expect.objectContaining({
+            songId: 'two',
+            playlistId: 'playlist-2',
+            songIndex: 0,
+            uri: 'content://media/audio/two',
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('syncs UI when the native player changes tracks from media controls', async () => {
+    const nativeListeners = new Map<string, (event?: unknown) => void>();
+    const nativePlayer = {
+      load: vi.fn().mockResolvedValue({ duration: 199 }),
+      play: vi.fn().mockResolvedValue({}),
+      pause: vi.fn().mockResolvedValue({}),
+      seek: vi.fn().mockResolvedValue({}),
+      setVolume: vi.fn().mockResolvedValue({}),
+      setQueue: vi.fn().mockResolvedValue({}),
+      getState: vi.fn().mockResolvedValue({ currentTime: 0, duration: 199, isPlaying: true, ended: false }),
+      addListener: vi.fn((eventName: string, listener: (event?: unknown) => void) => {
+        nativeListeners.set(eventName, listener);
+        return Promise.resolve({ remove: vi.fn() });
+      }),
+    };
+    Object.defineProperty(globalThis, 'Capacitor', {
+      configurable: true,
+      value: {
+        Plugins: {
+          NativeAudioPlayer: nativePlayer,
+        },
+      },
+    });
+    const { result } = renderHook(() => useMusicPlayer());
+
+    act(() => result.current.addSongs([makeNativeSong('one')]));
+    act(() => result.current.selectPlaylist('playlist-2'));
+    act(() => result.current.addSongs([makeNativeSong('two')]));
+    await act(async () => {
+      await result.current.togglePlay();
+      await Promise.resolve();
+    });
+    nativePlayer.load.mockClear();
+    nativePlayer.getState.mockResolvedValue({
+      currentTime: 4,
+      duration: 123,
+      isPlaying: true,
+      ended: false,
+      songId: 'one',
+      playlistId: 'playlist-1',
+      songIndex: 0,
+    });
+
+    act(() =>
+      nativeListeners.get('trackChanged')?.({
+        songId: 'one',
+        playlistId: 'playlist-1',
+        songIndex: 0,
+        currentTime: 4,
+        duration: 123,
+        isPlaying: true,
+      }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.currentPlaylistId).toBe('playlist-1');
+    expect(result.current.currentSong?.id).toBe('one');
+    expect(result.current.currentTime).toBe(4);
+    expect(result.current.duration).toBe(123);
+    expect(result.current.isPlaying).toBe(true);
+    expect(nativePlayer.load).not.toHaveBeenCalled();
+  });
+
   it('moves next and previous according to repeat-all rules', () => {
     const { result } = renderHook(() => useMusicPlayer());
     act(() => {
@@ -336,6 +465,26 @@ describe('useMusicPlayer', () => {
 
     expect(result.current.currentPlaylistId).toBe('playlist-2');
     expect(result.current.currentSong?.id).toBe('two');
+  });
+
+  it('plays a same-index song from another playlist while the current playlist is excluded from playback range', async () => {
+    const { result } = renderHook(() => useMusicPlayer());
+
+    act(() => result.current.addSongs([makeSong('one')]));
+    act(() => result.current.selectPlaylist('playlist-2'));
+    act(() => result.current.addSongs([makeSong('two')]));
+    await act(async () => {
+      await result.current.togglePlay();
+    });
+    act(() => result.current.togglePlaybackPlaylist('playlist-2'));
+    act(() => result.current.togglePlaybackPlaylist('playlist-1'));
+    act(() => result.current.selectPlaylist('playlist-1'));
+
+    act(() => result.current.playSong('one'));
+
+    expect(result.current.currentPlaylistId).toBe('playlist-1');
+    expect(result.current.currentSong?.id).toBe('one');
+    expect(result.current.isPlaying).toBe(true);
   });
 
   it('renames a playlist without losing its songs', () => {

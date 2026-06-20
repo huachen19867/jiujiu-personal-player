@@ -336,3 +336,15 @@ Android 原生层新增基础 `MediaSession` 和媒体通知。`NativeAudioPlaye
 移动端布局本轮只做收敛，不改整体视觉：控制卡片内边距、播放按钮尺寸和模块间距下调，歌单 tab 改成主按钮 + 重命名按钮的内部结构，避免新增编辑入口撑开横向布局。移动视口 `390x844` 冒烟检查结果：`bodyScrollWidth=375`、`clientWidth=375`，无横向溢出；检查图保存为 `C:\AI\Android\jiujiu-player-v1.0.7-mobile-check.png`。桌面浏览器模拟 `content://` 歌曲会报 `ERR_UNKNOWN_URL_SCHEME`，这是非原生环境读不了 Android URI 的预期限制，不影响 APK 内原生播放路径。
 
 验证结果：`npm test -- --run src/hooks/useMusicPlayer.test.tsx` 15 条通过；`npm test -- --run src/App.test.tsx` 15 条通过；`npm test -- --run` 6 个测试文件、45 条用例通过；`npm run build` 通过；`npm audit --audit-level=moderate` 返回 0 vulnerabilities；`npm run android:apk` 成功产出 APK。发布版本递增到 `versionCode=8`、`versionName=1.0.7`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.7-debug.apk`。APK 复查结果：`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。本次 APK SHA256 为 `7320750C718A3BC131F2248C471744D0DC71289FBA18EAEA9A3FBA1936F69BA1`。
+
+## 原生播放队列与反馈链接修正
+
+本轮继续处理真机反馈。第一处前端 bug 的根因是 `playSong()` 只比较歌曲在当前视图歌单里的 index，没有同时比较实际正在播放的 `currentPlaylistId`。当歌单二第 1 首正在播放，用户切到歌单一点击歌单一第 1 首时，旧逻辑把“同索引”误判成“同一首”，直接 return，表现为播放键失灵。现在短路条件改为“同歌单且同 index”，并新增回归测试覆盖“当前播放歌单二、取消歌单一播放范围、切回歌单一点击同索引歌曲”。
+
+后台播完仍停住的根因是架构边界：`1.0.7` 的 Android 通知栏只把 ended/next 事件回传给 React，但锁屏和后台时 WebView 事件循环不可靠，原生 `MediaPlayer` 不能等网页来决定下一首。`1.0.8` 起，前端会把播放范围内可原生播放的 `content://` 队列、当前队列 index 和播放模式同步给 `NativeAudioPlayerPlugin`；原生层在 `MediaPlayer.setOnCompletionListener`、通知栏下一首/上一首、MediaSession skip 回调里直接计算目标曲目、加载并继续播放，同时用 `trackChanged` 事件把实际播放状态回写给前端。这样即使 WebView 在后台不及时响应，原生层也有足够信息续播。
+
+UI 上把播放控制卡片提到歌单切换条之前，顺序变成“当前播放 -> 播放控制 -> 歌单切换 -> 添加歌曲”，减少播放操作时反复跨过歌单条。反馈模块展开后新增“GitHub链接”行，显示 `https://github.com/huachen19867/jiujiu-personal-player`，并提供复制按钮；复制失败时保留可点击链接，避免依赖剪贴板权限。
+
+新增/更新测试覆盖：原生播放范围队列会随勾选变化同步给 `setQueue`；原生 `trackChanged` 能让前端 UI 同步到锁屏/通知栏实际切到的歌曲；同索引不同歌单点歌不再失灵；反馈区 GitHub 链接可复制；播放控制区域排在歌单切换之前。验证结果：`npm test -- --run src/hooks/useMusicPlayer.test.tsx` 18 条通过；`npm test -- --run src/App.test.tsx` 15 条通过；`npm test -- --run` 6 个测试文件、48 条用例通过；`npm run build` 通过；`npm audit --audit-level=moderate` 返回 0 vulnerabilities；`npm run android:apk` 成功产出 APK。
+
+发布版本递增到 `versionCode=9`、`versionName=1.0.8`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.8-debug.apk`。APK 复查结果：`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。移动视口 `390x844` 冒烟检查显示 `bodyScrollWidth=375`、`clientWidth=375`，控制区在歌单条之前，GitHub 链接没有撑出横向溢出；检查图保存为 `C:\AI\Android\jiujiu-player-v1.0.8-mobile-check.png`。本次 APK SHA256 为 `3B4D96FA6821110F3C8A918B5AE54D7709708E28DE3012C67A5241D234F2FED6`。

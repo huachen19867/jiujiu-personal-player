@@ -78,21 +78,6 @@ function App() {
               onTogglePlaylistSelection={player.togglePlaybackPlaylist}
             />
 
-            <PlaylistSwitcher
-              playlists={player.playlistGroups}
-              activePlaylistId={player.activePlaylistId}
-              onSelectPlaylist={player.selectPlaylist}
-              onRenamePlaylist={player.renamePlaylist}
-            />
-
-            <ImportActions
-              notice={notice ?? player.errorMessage ?? reauthorizationNotice}
-              targetPlaylistName={player.activePlaylistName}
-              nativeAudioImportSupported={nativeAudioImportSupported}
-              onFilesSelected={addFiles}
-              onNativeAudioImport={importNativeAudio}
-            />
-
             <TransportControls
               currentTime={player.currentTime}
               duration={player.duration}
@@ -106,6 +91,21 @@ function App() {
               onSeek={player.seek}
               onVolumeChange={player.setVolumeLevel}
               onCycleMode={player.cycleMode}
+            />
+
+            <PlaylistSwitcher
+              playlists={player.playlistGroups}
+              activePlaylistId={player.activePlaylistId}
+              onSelectPlaylist={player.selectPlaylist}
+              onRenamePlaylist={player.renamePlaylist}
+            />
+
+            <ImportActions
+              notice={notice ?? player.errorMessage ?? reauthorizationNotice}
+              targetPlaylistName={player.activePlaylistName}
+              nativeAudioImportSupported={nativeAudioImportSupported}
+              onFilesSelected={addFiles}
+              onNativeAudioImport={importNativeAudio}
             />
           </div>
 

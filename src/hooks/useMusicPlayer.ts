@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getNativeAudioPlayer } from '../lib/nativeBridge';
+import type { NativeAudioPlayerEventPayload, NativeAudioQueueItem } from '../lib/nativeBridge';
 import { getNextIndex, getPreviousIndex } from '../lib/playbackQueue';
 import { DEFAULT_PLAYLIST_ID, DEFAULT_PLAYLIST_NAME, loadLibraryState, saveLibraryState } from '../lib/storage';
 import type { PlaybackMode, PlaylistGroup, Song, StoredPlaylistGroup, StoredSong } from '../types/music';
@@ -49,6 +50,7 @@ export function useMusicPlayer() {
   const volumeRef = useRef(savedState.volume);
   const playlistChangedInSessionRef = useRef(false);
   const playSelectedSongRef = useRef(false);
+  const nativeLoadedSongIdRef = useRef<string | null>(null);
 
   const activePlaylist = useMemo(
     () => playlistGroups.find((playlist) => playlist.id === activePlaylistId) ?? playlistGroups[0],
@@ -117,6 +119,7 @@ export function useMusicPlayer() {
       audio.pause();
       audio.src = '';
       void nativeAudioPlayer?.pause();
+      nativeLoadedSongIdRef.current = null;
       setIsPlaying(false);
       setCurrentTime(0);
       setDuration(0);
@@ -130,9 +133,21 @@ export function useMusicPlayer() {
     if (currentSong.nativeUri && nativeAudioPlayer) {
       audio.pause();
       audio.src = '';
+      setErrorMessage(null);
+
+      if (nativeLoadedSongIdRef.current === currentSong.id) {
+        return;
+      }
+
       setCurrentTime(0);
       setDuration(currentSong.duration ?? 0);
-      setErrorMessage(null);
+      const nativeQueue = createNativePlaybackQueueOptions(
+        playlistGroupsRef.current,
+        selectedPlaybackPlaylistIdsRef.current,
+        currentPlaylistIdRef.current,
+        currentSong.id,
+        playbackModeRef.current,
+      );
 
       void nativeAudioPlayer
         .load({
@@ -140,8 +155,13 @@ export function useMusicPlayer() {
           volume: volumeRef.current,
           title: currentSong.name,
           playlist: currentPlaylist?.name ?? DEFAULT_PLAYLIST_NAME,
+          songId: currentSong.id,
+          playlistId: currentPlaylistIdRef.current,
+          songIndex: currentIndexRef.current ?? 0,
+          ...nativeQueue,
         })
         .then((state) => {
+          nativeLoadedSongIdRef.current = currentSong.id;
           setDuration(state.duration ?? currentSong.duration ?? 0);
           if (!shouldPlay) {
             return undefined;
@@ -159,6 +179,7 @@ export function useMusicPlayer() {
     }
 
     void nativeAudioPlayer?.pause();
+    nativeLoadedSongIdRef.current = null;
     audio.src = currentSong.url;
     audio.currentTime = 0;
     setCurrentTime(0);
@@ -176,7 +197,31 @@ export function useMusicPlayer() {
           setErrorMessage('这首歌暂时播放不了，可能是格式或编码不受当前手机支持。');
         });
     }
-  }, [audio, currentSong, nativeAudioPlayer]);
+  }, [audio, currentSong, currentPlaylist?.name, nativeAudioPlayer]);
+
+  useEffect(() => {
+    if (!currentSong?.nativeUri || !nativeAudioPlayer?.setQueue) {
+      return;
+    }
+
+    void nativeAudioPlayer.setQueue(
+      createNativePlaybackQueueOptions(
+        playlistGroups,
+        selectedPlaybackPlaylistIds,
+        currentPlaylist?.id ?? DEFAULT_PLAYLIST_ID,
+        currentSong.id,
+        playbackMode,
+      ),
+    );
+  }, [
+    currentPlaylist?.id,
+    currentSong?.id,
+    currentSong?.nativeUri,
+    nativeAudioPlayer,
+    playbackMode,
+    playlistGroups,
+    selectedPlaybackPlaylistIds,
+  ]);
 
   const pause = useCallback(() => {
     audio.pause();
@@ -256,6 +301,48 @@ export function useMusicPlayer() {
     moveByDirection(1, true);
   }, [moveByDirection]);
 
+  const syncNativeTrackState = useCallback((state?: NativeAudioPlayerEventPayload | null) => {
+    if (!state?.songId) {
+      return false;
+    }
+
+    const playlists = playlistGroupsRef.current;
+    let playlistId = state.playlistId;
+    let songIndex = typeof state.songIndex === 'number' ? state.songIndex : -1;
+    let playlist = playlistId ? playlists.find((group) => group.id === playlistId) : undefined;
+
+    if (!playlist || !playlist.songs[songIndex] || playlist.songs[songIndex].id !== state.songId) {
+      const foundPlaylist = playlists.find((group) => group.songs.some((song) => song.id === state.songId));
+      if (!foundPlaylist) {
+        return false;
+      }
+      playlist = foundPlaylist;
+      playlistId = foundPlaylist.id;
+      songIndex = foundPlaylist.songs.findIndex((song) => song.id === state.songId);
+    }
+
+    if (!playlistId || songIndex < 0) {
+      return false;
+    }
+
+    nativeLoadedSongIdRef.current = state.songId;
+    setCurrentPlaylistId(playlistId);
+    setCurrentIndex(songIndex);
+    setErrorMessage(null);
+
+    if (typeof state.currentTime === 'number' && Number.isFinite(state.currentTime)) {
+      setCurrentTime(state.currentTime);
+    }
+    if (typeof state.duration === 'number' && Number.isFinite(state.duration)) {
+      setDuration(state.duration);
+    }
+    if (typeof state.isPlaying === 'boolean') {
+      setIsPlaying(state.isPlaying);
+    }
+
+    return true;
+  }, []);
+
   const next = useCallback(() => {
     moveByDirection(1, isPlaying);
   }, [isPlaying, moveByDirection]);
@@ -326,8 +413,11 @@ export function useMusicPlayer() {
           return;
         }
 
-        setCurrentTime(state.currentTime);
-        setDuration(state.duration);
+        const trackChanged = syncNativeTrackState(state);
+        if (!trackChanged) {
+          setCurrentTime(state.currentTime);
+          setDuration(state.duration);
+        }
         if (state.ended) {
           advanceAfterTrackEnd();
         }
@@ -344,7 +434,7 @@ export function useMusicPlayer() {
       canceled = true;
       window.clearInterval(timer);
     };
-  }, [advanceAfterTrackEnd, currentSong?.nativeUri, isPlaying, nativeAudioPlayer]);
+  }, [advanceAfterTrackEnd, currentSong?.nativeUri, isPlaying, nativeAudioPlayer, syncNativeTrackState]);
 
   useEffect(() => {
     if (!nativeAudioPlayer?.addListener) {
@@ -353,7 +443,10 @@ export function useMusicPlayer() {
 
     let removed = false;
     const listenerHandles: { remove: () => Promise<void> | void }[] = [];
-    const registerListener = (eventName: 'ended' | 'next' | 'previous' | 'play' | 'pause', listener: () => void) => {
+    const registerListener = (
+      eventName: 'ended' | 'next' | 'previous' | 'play' | 'pause' | 'trackChanged',
+      listener: (event?: NativeAudioPlayerEventPayload) => void,
+    ) => {
       void Promise.resolve(nativeAudioPlayer.addListener?.(eventName, listener)).then((handle) => {
         if (!handle) {
           return;
@@ -371,6 +464,7 @@ export function useMusicPlayer() {
     registerListener('previous', () => moveByDirection(-1, true));
     registerListener('play', () => setIsPlaying(true));
     registerListener('pause', () => setIsPlaying(false));
+    registerListener('trackChanged', syncNativeTrackState);
 
     return () => {
       removed = true;
@@ -378,7 +472,7 @@ export function useMusicPlayer() {
         void handle.remove();
       });
     };
-  }, [advanceAfterTrackEnd, moveByDirection, nativeAudioPlayer]);
+  }, [advanceAfterTrackEnd, moveByDirection, nativeAudioPlayer, syncNativeTrackState]);
 
   useEffect(() => {
     return () => {
@@ -451,7 +545,7 @@ export function useMusicPlayer() {
     (songId: string) => {
       const index = songs.findIndex((song) => song.id === songId);
       if (index >= 0) {
-        if (index === currentIndex) {
+        if (activePlaylistId === currentPlaylistId && index === currentIndex) {
           if (!isPlaying) {
             return play();
           }
@@ -463,7 +557,7 @@ export function useMusicPlayer() {
         setCurrentIndex(index);
       }
     },
-    [activePlaylistId, currentIndex, isPlaying, play, songs],
+    [activePlaylistId, currentIndex, currentPlaylistId, isPlaying, play, songs],
   );
 
   const selectPlaylist = useCallback(
@@ -764,4 +858,41 @@ function createPlaybackQueue(
         }))
       : [],
   );
+}
+
+function createNativePlaybackQueueOptions(
+  playlists: PlaylistGroup[],
+  selectedPlaylistIds: string[],
+  fallbackPlaylistId: string,
+  currentSongId: string,
+  playbackMode: PlaybackMode,
+): {
+  queue: NativeAudioQueueItem[];
+  queueIndex: number;
+  playbackMode: PlaybackMode;
+} {
+  const queue = createPlaybackQueue(playlists, selectedPlaylistIds, fallbackPlaylistId).flatMap((entry) => {
+    if (!entry.song.nativeUri) {
+      return [];
+    }
+
+    const playlistName = playlists.find((playlist) => playlist.id === entry.playlistId)?.name ?? DEFAULT_PLAYLIST_NAME;
+    return [
+      {
+        songId: entry.song.id,
+        playlistId: entry.playlistId,
+        songIndex: entry.songIndex,
+        uri: entry.song.nativeUri,
+        title: entry.song.name,
+        playlist: playlistName,
+        duration: entry.song.duration,
+      },
+    ];
+  });
+
+  return {
+    queue,
+    queueIndex: queue.findIndex((entry) => entry.songId === currentSongId),
+    playbackMode,
+  };
 }

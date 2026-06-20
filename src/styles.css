@@ -908,6 +908,58 @@ input[type='range'] {
   object-fit: cover;
 }
 
+.feedback-github {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(244, 119, 42, 0.18);
+}
+
+.feedback-github svg {
+  color: var(--accent);
+}
+
+.feedback-github-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.feedback-github-copy span {
+  color: var(--text-primary);
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
+.feedback-github-copy a {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.feedback-github button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid rgba(244, 119, 42, 0.24);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .playlist-heading {
   justify-content: space-between;
   gap: 18px;

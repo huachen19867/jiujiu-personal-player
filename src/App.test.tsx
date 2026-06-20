@@ -52,10 +52,21 @@ describe('App', () => {
     expect(screen.queryByText('个人导航')).not.toBeInTheDocument();
     expect(screen.queryByText(/\+----------------/)).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: '还没有歌' })).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole('region', { name: '播放控制' })
+        .compareDocumentPosition(screen.getByRole('region', { name: '歌单切换' })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('opens the feedback contact card from the bottom profile panel', async () => {
     const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
     render(<App />);
 
     await user.click(screen.getByRole('button', { name: '问题反馈' }));
@@ -66,6 +77,15 @@ describe('App', () => {
       'src',
       '/feedback-qr.jpg',
     );
+    expect(screen.getByText('GitHub链接')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'https://github.com/huachen19867/jiujiu-personal-player' }),
+    ).toHaveAttribute('href', 'https://github.com/huachen19867/jiujiu-personal-player');
+
+    await user.click(screen.getByRole('button', { name: '复制 GitHub 链接' }));
+
+    expect(writeText).toHaveBeenCalledWith('https://github.com/huachen19867/jiujiu-personal-player');
+    expect(screen.getByRole('button', { name: '已复制 GitHub 链接' })).toBeInTheDocument();
   });
 
   it('restores Android native songs after refresh', async () => {

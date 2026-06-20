@@ -25,7 +25,7 @@ cn.jiujiu.personalplayer
 
 ```text
 C:\AI\Android\jiujiu-personal-player-debug.apk
-C:\AI\Android\jiujiu-personal-player-v1.0.7-debug.apk
+C:\AI\Android\jiujiu-personal-player-v1.0.8-debug.apk
 ```
 
 本地生成命令：
@@ -36,7 +36,7 @@ npm run android:apk
 
 注意：当前是 debug 签名包，适合发给自己或朋友测试。真正上架应用商店时，需要做 release 签名，并且长期保存签名文件；签名丢了，以后就没法给同一个应用正常升级。
 
-Android 覆盖升级依赖同一个包名、同一套签名，并且建议递增 `versionCode`。`1.0.0` 的测试包使用 `versionCode=1`；`1.0.1` 升到 `versionCode=2`；`1.0.2` 升到 `versionCode=3`；`1.0.3` 升到 `versionCode=4`；`1.0.4` 升到 `versionCode=5`；`1.0.5` 升到 `versionCode=6`；`1.0.6` 升到 `versionCode=7`；`1.0.7` 升到 `versionCode=8`。如果手机浏览器缓存了旧 APK，优先下载带版本号的文件名。
+Android 覆盖升级依赖同一个包名、同一套签名，并且建议递增 `versionCode`。`1.0.0` 的测试包使用 `versionCode=1`；`1.0.1` 升到 `versionCode=2`；`1.0.2` 升到 `versionCode=3`；`1.0.3` 升到 `versionCode=4`；`1.0.4` 升到 `versionCode=5`；`1.0.5` 升到 `versionCode=6`；`1.0.6` 升到 `versionCode=7`；`1.0.7` 升到 `versionCode=8`；`1.0.8` 升到 `versionCode=9`。如果手机浏览器缓存了旧 APK，优先下载带版本号的文件名。
 
 ## 热更新判断
 
@@ -82,4 +82,4 @@ Android 覆盖升级依赖同一个包名、同一套签名，并且建议递增
 
 `1.0.1` 开始，Android App 内由原生 `MediaPlayer` 播放通过原生选择器导入的 `content://` 音频，离开当前界面后不再依赖 WebView 的 `<audio>`。这能解决“切到后台立刻停”的主要问题。
 
-`1.0.7` 开始补入基础 `MediaSession` 和媒体通知：播放时会在通知栏/锁屏显示曲名、当前歌单以及上一首/播放暂停/下一首控制。当前还没有完整 foreground service；如果用户从任务列表划掉应用，或系统回收进程，音乐仍可能停止。后续要做成正式播放器，需要继续补前台服务，把后台长时间播放做得更像网易云这类原生播放器。
+`1.0.7` 开始补入基础 `MediaSession` 和媒体通知：播放时会在通知栏/锁屏显示曲名、当前歌单以及上一首/播放暂停/下一首控制。`1.0.8` 起，前端会把播放范围内的 `content://` 队列同步给原生播放器，原生层播完当前曲目或响应锁屏下一首时，可直接加载下一首并继续播放，不再完全依赖后台中的 WebView 事件。当前还没有完整 foreground service；如果用户从任务列表划掉应用，或系统回收进程，音乐仍可能停止。后续要做成正式播放器，需要继续补前台服务，把后台长时间播放做得更像网易云这类原生播放器。
