@@ -15,14 +15,19 @@ export interface NativePluginListenerHandle {
   remove: () => Promise<void> | void;
 }
 
+export type NativeAudioPlayerEvent = 'ended' | 'next' | 'previous' | 'play' | 'pause';
+
 export interface NativeAudioPlayerPlugin {
-  load: (options: { uri: string; volume: number }) => Promise<{ duration: number }>;
+  load: (options: { uri: string; volume: number; title?: string; playlist?: string }) => Promise<{ duration: number }>;
   play: () => Promise<void>;
   pause: () => Promise<void>;
   seek: (options: { position: number }) => Promise<void>;
   setVolume: (options: { volume: number }) => Promise<void>;
   getState: () => Promise<NativeAudioPlayerState>;
-  addListener?: (eventName: 'ended', listener: () => void) => Promise<NativePluginListenerHandle> | NativePluginListenerHandle;
+  addListener?: (
+    eventName: NativeAudioPlayerEvent,
+    listener: () => void,
+  ) => Promise<NativePluginListenerHandle> | NativePluginListenerHandle;
   release?: () => Promise<void>;
 }
 

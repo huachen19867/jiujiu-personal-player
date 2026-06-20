@@ -202,7 +202,13 @@ describe('useMusicPlayer', () => {
       await result.current.togglePlay();
     });
 
-    expect(nativePlayer.load).toHaveBeenCalledWith({ uri: 'content://media/audio/1', volume: 0.85 });
+    expect(nativePlayer.load).toHaveBeenCalledWith(
+      expect.objectContaining({
+        uri: 'content://media/audio/1',
+        volume: 0.85,
+        title: 'Native One',
+      }),
+    );
     expect(nativePlayer.play).toHaveBeenCalled();
     expect(audioInstances[0].play).not.toHaveBeenCalled();
     expect(result.current.duration).toBe(199);
@@ -273,7 +279,13 @@ describe('useMusicPlayer', () => {
 
     expect(result.current.currentSong?.id).toBe('native-two');
     expect(result.current.isPlaying).toBe(true);
-    expect(nativePlayer.load).toHaveBeenLastCalledWith({ uri: 'content://media/audio/2', volume: 0.85 });
+    expect(nativePlayer.load).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        uri: 'content://media/audio/2',
+        volume: 0.85,
+        title: 'Native Two',
+      }),
+    );
     expect(nativePlayer.play).toHaveBeenCalled();
   });
 
@@ -292,6 +304,49 @@ describe('useMusicPlayer', () => {
 
     act(() => result.current.previous());
     expect(result.current.currentSong?.id).toBe('two');
+  });
+
+  it('continues into another selected playlist after the current playlist is unchecked', async () => {
+    const { result } = renderHook(() => useMusicPlayer());
+
+    act(() => result.current.addSongs([makeSong('one')]));
+    act(() => result.current.selectPlaylist('playlist-2'));
+    act(() => result.current.addSongs([makeSong('two')]));
+    await act(async () => {
+      await result.current.togglePlay();
+    });
+
+    act(() => result.current.togglePlaybackPlaylist('playlist-2'));
+    act(() => result.current.togglePlaybackPlaylist('playlist-1'));
+    act(() => audioInstances[0].dispatch('ended'));
+
+    expect(result.current.currentPlaylistId).toBe('playlist-2');
+    expect(result.current.currentSong?.id).toBe('two');
+    expect(result.current.isPlaying).toBe(true);
+  });
+
+  it('continues from the end of one selected playlist into the next selected playlist', () => {
+    const { result } = renderHook(() => useMusicPlayer());
+
+    act(() => result.current.addSongs([makeSong('one')]));
+    act(() => result.current.selectPlaylist('playlist-2'));
+    act(() => result.current.addSongs([makeSong('two')]));
+    act(() => result.current.togglePlaybackPlaylist('playlist-2'));
+    act(() => audioInstances[0].dispatch('ended'));
+
+    expect(result.current.currentPlaylistId).toBe('playlist-2');
+    expect(result.current.currentSong?.id).toBe('two');
+  });
+
+  it('renames a playlist without losing its songs', () => {
+    const { result } = renderHook(() => useMusicPlayer());
+
+    act(() => result.current.addSongs([makeSong('one')]));
+    act(() => result.current.renamePlaylist('playlist-1', '古风'));
+
+    expect(result.current.playlistGroups[0].name).toBe('古风');
+    expect(result.current.activePlaylistName).toBe('古风');
+    expect(result.current.songs.map((song) => song.id)).toEqual(['one']);
   });
 
   it('selects a neighbor when the current song is removed', () => {

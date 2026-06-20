@@ -82,6 +82,7 @@ function App() {
               playlists={player.playlistGroups}
               activePlaylistId={player.activePlaylistId}
               onSelectPlaylist={player.selectPlaylist}
+              onRenamePlaylist={player.renamePlaylist}
             />
 
             <ImportActions

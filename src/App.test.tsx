@@ -208,6 +208,22 @@ describe('App', () => {
     expect(within(playbackRangeMenu).queryByRole('button', { name: '查看 歌单三' })).not.toBeInTheDocument();
   });
 
+  it('renames the active playlist from the playlist switcher', async () => {
+    const user = userEvent.setup();
+    const prompt = vi.spyOn(window, 'prompt').mockReturnValue('古风');
+    render(<App />);
+
+    await user.upload(screen.getByLabelText('添加到：歌单一，选歌，可多选'), [
+      new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
+    ]);
+    await user.click(screen.getByRole('button', { name: '重命名 歌单一' }));
+
+    expect(prompt).toHaveBeenCalledWith('重命名歌单', '歌单一');
+    expect(screen.getByRole('button', { name: '查看 古风' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '古风：1 首歌' })).toBeInTheDocument();
+    expect(screen.getByText('添加到：古风')).toBeInTheDocument();
+  });
+
   it('collapses and expands the playlist without deleting songs', async () => {
     const user = userEvent.setup();
     render(<App />);

@@ -322,3 +322,17 @@ CSS 色板回到 `#f9fafb` 页面、`#ffffff` 卡片、`#111827/#4b5563/#9ca3af`
 ## README 项目动机补充
 
 用户截图反馈看不到项目动机文案，原因是上一轮只更新了 GitHub About description，README 顶部仍是工程说明。当前处理为：按用户指定原文，把“众所周知的平台不一定能下载或方便播放”“现成播放器山寨、粗糙、广告多、权限重”“想做干净、好看、手机端能用、本地歌曲播放器”的动机放到 README 标题下方；工程说明保留在动机之后。
+
+## 歌单播放范围、重命名与锁屏通知
+
+本轮真机反馈集中在四件事：歌单切换条和控制区在手机上显得割裂；“播放范围”复选框像摆设，取消当前歌单后播完当前曲目没有进入仍勾选的歌单；锁屏/状态栏缺少播放器通知；点歌单名应支持重命名。
+
+播放逻辑的关键修正是把勾选的歌单真正当作队列。`moveByDirection()` 现在会先按 `selectedPlaybackPlaylistIds` 生成跨歌单队列；如果当前正在播放的歌已经不在勾选范围里，例如用户取消歌单一、只保留歌单二，那么当前歌播完后会直接进入歌单二的第一首，而不是回落到歌单一并停住。新增 hook 测试覆盖“取消当前歌单后进入另一首选中歌单”和“歌单一播完进入歌单二”。
+
+歌单名称现在由 `renamePlaylist()` 持久更新，`ensureTrailingEmptyPlaylist()` 不再每轮强制把名称改回“歌单一/二/三”，因此自定义名称不会被尾部空歌单归一化逻辑覆盖。UI 上 `PlaylistSwitcher` 保持“点卡片切换查看/导入目标”，额外提供一个小编辑按钮触发 `window.prompt('重命名歌单')`；App 测试覆盖重命名后切换条、歌单标题和导入按钮都同步显示新名称。
+
+Android 原生层新增基础 `MediaSession` 和媒体通知。`NativeAudioPlayerPlugin` 在加载歌曲时接收 `title` 与 `playlist`，播放/暂停/完成时更新 `PlaybackState` 和 `MediaMetadata`，通知栏提供上一首、播放/暂停、下一首三个动作，并通过插件事件把通知栏操作回传给 React。`AndroidManifest.xml` 补充 `POST_NOTIFICATIONS` 权限声明；当前仍不是完整 foreground service，如果用户从任务列表划掉应用或系统回收进程，仍可能停止，但锁屏和状态栏已经有基础媒体入口。
+
+移动端布局本轮只做收敛，不改整体视觉：控制卡片内边距、播放按钮尺寸和模块间距下调，歌单 tab 改成主按钮 + 重命名按钮的内部结构，避免新增编辑入口撑开横向布局。移动视口 `390x844` 冒烟检查结果：`bodyScrollWidth=375`、`clientWidth=375`，无横向溢出；检查图保存为 `C:\AI\Android\jiujiu-player-v1.0.7-mobile-check.png`。桌面浏览器模拟 `content://` 歌曲会报 `ERR_UNKNOWN_URL_SCHEME`，这是非原生环境读不了 Android URI 的预期限制，不影响 APK 内原生播放路径。
+
+验证结果：`npm test -- --run src/hooks/useMusicPlayer.test.tsx` 15 条通过；`npm test -- --run src/App.test.tsx` 15 条通过；`npm test -- --run` 6 个测试文件、45 条用例通过；`npm run build` 通过；`npm audit --audit-level=moderate` 返回 0 vulnerabilities；`npm run android:apk` 成功产出 APK。发布版本递增到 `versionCode=8`、`versionName=1.0.7`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.7-debug.apk`。APK 复查结果：`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。本次 APK SHA256 为 `7320750C718A3BC131F2248C471744D0DC71289FBA18EAEA9A3FBA1936F69BA1`。

@@ -135,7 +135,12 @@ export function useMusicPlayer() {
       setErrorMessage(null);
 
       void nativeAudioPlayer
-        .load({ uri: currentSong.nativeUri, volume: volumeRef.current })
+        .load({
+          uri: currentSong.nativeUri,
+          volume: volumeRef.current,
+          title: currentSong.name,
+          playlist: currentPlaylist?.name ?? DEFAULT_PLAYLIST_NAME,
+        })
         .then((state) => {
           setDuration(state.duration ?? currentSong.duration ?? 0);
           if (!shouldPlay) {
@@ -215,6 +220,11 @@ export function useMusicPlayer() {
             ? getNextIndex(queueIndex, queue.length, playbackModeRef.current)
             : getPreviousIndex(queueIndex, queue.length, playbackModeRef.current);
         moveToQueueEntry(nextQueueIndex === null ? null : queue[nextQueueIndex], shouldKeepPlaying);
+        return;
+      }
+
+      if (queue.length) {
+        moveToQueueEntry(direction === 1 ? queue[0] : queue[queue.length - 1], shouldKeepPlaying);
         return;
       }
 
@@ -342,23 +352,33 @@ export function useMusicPlayer() {
     }
 
     let removed = false;
-    let listenerHandle: { remove: () => Promise<void> | void } | null = null;
+    const listenerHandles: { remove: () => Promise<void> | void }[] = [];
+    const registerListener = (eventName: 'ended' | 'next' | 'previous' | 'play' | 'pause', listener: () => void) => {
+      void Promise.resolve(nativeAudioPlayer.addListener?.(eventName, listener)).then((handle) => {
+        if (!handle) {
+          return;
+        }
+        if (removed) {
+          void handle.remove();
+          return;
+        }
+        listenerHandles.push(handle);
+      });
+    };
 
-    void Promise.resolve(nativeAudioPlayer.addListener('ended', advanceAfterTrackEnd)).then((handle) => {
-      if (removed) {
-        void handle.remove();
-        return;
-      }
-      listenerHandle = handle;
-    });
+    registerListener('ended', advanceAfterTrackEnd);
+    registerListener('next', () => moveByDirection(1, true));
+    registerListener('previous', () => moveByDirection(-1, true));
+    registerListener('play', () => setIsPlaying(true));
+    registerListener('pause', () => setIsPlaying(false));
 
     return () => {
       removed = true;
-      if (listenerHandle) {
-        void listenerHandle.remove();
-      }
+      listenerHandles.forEach((handle) => {
+        void handle.remove();
+      });
     };
-  }, [advanceAfterTrackEnd, nativeAudioPlayer]);
+  }, [advanceAfterTrackEnd, moveByDirection, nativeAudioPlayer]);
 
   useEffect(() => {
     return () => {
@@ -467,6 +487,20 @@ export function useMusicPlayer() {
     },
     [activePlaylistId, isPlaying, playlistGroups],
   );
+
+  const renamePlaylist = useCallback((playlistId: string, nextName: string) => {
+    const trimmedName = nextName.trim();
+    if (!trimmedName) {
+      return;
+    }
+
+    playlistChangedInSessionRef.current = true;
+    setPlaylistGroups((existingGroups) =>
+      ensureTrailingEmptyPlaylist(
+        existingGroups.map((playlist) => (playlist.id === playlistId ? { ...playlist, name: trimmedName } : playlist)),
+      ),
+    );
+  }, []);
 
   const togglePlaybackPlaylist = useCallback((playlistId: string) => {
     setSelectedPlaybackPlaylistIds((ids) => {
@@ -601,6 +635,7 @@ export function useMusicPlayer() {
     togglePlay,
     playSong,
     selectPlaylist,
+    renamePlaylist,
     togglePlaybackPlaylist,
     next,
     previous,
@@ -678,7 +713,7 @@ function ensureTrailingEmptyPlaylist(playlists: PlaylistGroup[]): PlaylistGroup[
     return {
       ...playlist,
       id: playlist.id || createPlaylistId(index),
-      name: createPlaylistName(index),
+      name: playlist.name || createPlaylistName(index),
     };
   });
 }
