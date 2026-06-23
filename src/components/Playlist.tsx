@@ -22,13 +22,14 @@ export function Playlist({ playlistName, songs, currentSongId, onPlaySong, onRem
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedSongIds, setSelectedSongIds] = useState<string[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [listViewportHeight, setListViewportHeight] = useState(0);
-  const [listScrollTop, setListScrollTop] = useState(0);
+  const listViewportHeightRef = useRef(0);
+  const listScrollTopRef = useRef(0);
+  const [, forceUpdate] = useState(0);
   const selectedCount = selectedSongIds.length;
   const selectedSongIdSet = useMemo(() => new Set(selectedSongIds), [selectedSongIds]);
   const shouldVirtualize = songs.length > VIRTUALIZE_THRESHOLD;
-  const viewportHeight = listViewportHeight || Math.min(620, Math.max(1, songs.length) * ROW_HEIGHT);
-  const startIndex = shouldVirtualize ? Math.max(0, Math.floor(listScrollTop / ROW_HEIGHT) - OVERSCAN_ROWS) : 0;
+  const viewportHeight = listViewportHeightRef.current || Math.min(620, Math.max(1, songs.length) * ROW_HEIGHT);
+  const startIndex = shouldVirtualize ? Math.max(0, Math.floor(listScrollTopRef.current / ROW_HEIGHT) - OVERSCAN_ROWS) : 0;
   const endIndex = shouldVirtualize
     ? Math.min(songs.length, startIndex + Math.ceil(viewportHeight / ROW_HEIGHT) + OVERSCAN_ROWS * 2)
     : songs.length;
@@ -48,22 +49,47 @@ export function Playlist({ playlistName, songs, currentSongId, onPlaySong, onRem
 
   useEffect(() => {
     if (!shouldVirtualize) {
-      setListScrollTop(0);
-      setListViewportHeight(0);
+      listScrollTopRef.current = 0;
+      listViewportHeightRef.current = 0;
       return;
     }
 
+    const ul = listRef.current;
+    if (!ul) return;
+
     const updateViewportHeight = () => {
-      setListViewportHeight(listRef.current?.clientHeight ?? 0);
+      listViewportHeightRef.current = ul.clientHeight;
+      forceUpdate((n) => n + 1);
     };
 
-    updateViewportHeight();
-    window.addEventListener('resize', updateViewportHeight);
-    return () => window.removeEventListener('resize', updateViewportHeight);
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(updateViewportHeight);
+      observer.observe(ul);
+    }
+
+    let rafId = 0;
+    let lastScrollTop = -1;
+    const onScroll = () => {
+      const st = ul.scrollTop;
+      if (st !== lastScrollTop) {
+        lastScrollTop = st;
+        listScrollTopRef.current = st;
+        forceUpdate((n) => n + 1);
+      }
+      rafId = requestAnimationFrame(onScroll);
+    };
+
+    rafId = requestAnimationFrame(onScroll);
+
+    return () => {
+      observer?.disconnect();
+      cancelAnimationFrame(rafId);
+    };
   }, [shouldVirtualize]);
 
   useEffect(() => {
-    setListScrollTop(0);
+    listScrollTopRef.current = 0;
     listRef.current?.scrollTo?.({ top: 0 });
   }, [playlistName, songs.length]);
 
@@ -159,11 +185,6 @@ export function Playlist({ playlistName, songs, currentSongId, onPlaySong, onRem
                 }
               : undefined
           }
-          onScroll={(event) => {
-            if (shouldVirtualize) {
-              setListScrollTop(event.currentTarget.scrollTop);
-            }
-          }}
         >
           {visibleSongs.map((song, offset) => {
             const index = startIndex + offset;
