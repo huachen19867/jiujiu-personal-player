@@ -156,8 +156,7 @@ public class LocalMusicPickerPlugin extends Plugin {
         return songs;
     }
 
-    private JSObject toSongObject(Uri uri) {        takePersistableReadPermission(uri);
-
+    private JSObject toSongObject(Uri uri) {
         String displayName = uri.getLastPathSegment();
         String name = displayName == null ? "Local Audio" : displayName;
         int slashIdx = name.lastIndexOf('/');

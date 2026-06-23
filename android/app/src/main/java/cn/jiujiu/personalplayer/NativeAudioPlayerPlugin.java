@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.AudioAttributes;
@@ -221,7 +222,11 @@ public class NativeAudioPlayerPlugin extends Plugin {
                 .build()
         );
         mediaPlayer.setWakeMode(getContext(), PowerManager.PARTIAL_WAKE_LOCK);
-        mediaPlayer.setDataSource(getContext(), Uri.parse(track.uri));
+                try {
+            getContext().getContentResolver().takePersistableUriPermission(
+                Uri.parse(track.uri), Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (SecurityException ignored) { }
+mediaPlayer.setDataSource(getContext(), Uri.parse(track.uri));
         mediaPlayer.setVolume(volume, volume);
         mediaPlayer.setOnCompletionListener((player) -> {
             if (moveInQueue(1, true)) {
