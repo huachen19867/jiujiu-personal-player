@@ -221,3 +221,33 @@ UI 缁撴瀯涓婏紝`PlaylistSwitcher` 鐜板湪鍚屾椂鎵挎媴鈥滄煡鐪?
 版本号自增从 1.0.10 → 1.0.13（versionCode 11 → 14），README、package.json 的 copy-apk 路径同步更新。测试覆盖扫描入口、虚拟滚动渲染数量、跨视图空歌单播放启动、重命名歌单改用 find 定位。验证结果：`npm test -- --run` 6 个测试文件、56 条用例全通过；`npm run build` TypeScript + Vite 生产构建通过。
 
 提交 commit `4e3caa1`，已推送到 GitHub main 分支。
+
+## 虚拟滚动二轮修复与版本迭代
+
+### v1.0.14 (versionCode 15) — 第一次尝试 ref + rAF 方案
+问题：导入 1000 首后向下滚动只显示空白。
+根因判断：React setListScrollTop 在 Android WebView 上异步滞后。
+方案：改 listScrollTopRef + equestAnimationFrame 持续读取真实 scrollTop，orceUpdate 触发渲染；视口高度用 ResizeObserver。
+结果：依然不行。rAF 闭包里捕获的 ul 变量在 React re-render 后 stale，scrollTop 仍是 0。
+额外问题：页面跟着歌单一起滚动（scroll chaining），因歌单 <ul> 未设 overscroll-behavior。
+
+### v1.0.15 (versionCode 16) — 第二次尝试原生 scroll 事件
+方案：删掉 rAF 轮询，改为 ul.addEventListener('scroll', handleScroll, { passive: true })，handler 内从 listRef.current 实时读 scrollTop；rAF 仅用于节流 orceUpdate。
+CSS 补了 .playlist.is-virtualized { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }。
+结果：滚到第 100 首左右就卡死，无法继续往下翻。
+根因再次判断：Android WebView 中 React 重绘时内联 paddingTop/paddingBottom 变化导致 scrollTop 被动跳动，事件循环中 scrollTop 反复被修正，用户手势无法突破。
+
+### v1.0.16 (versionCode 17) — 抬高虚拟滚动阈值
+方案：VIRTUALIZE_THRESHOLD 从 120 提升到 2500，1000 首直接全渲染，1000 个 DOM 节点 Android WebView 完全能扛。
+CSS 保留 overscroll-behavior: contain。
+结果：翻 1000 首流畅不再卡，页面不会跟着滚动。
+验证：
+pm test -- --run 6 文件 56 条全通过，APK 校验全绿。
+
+### v1.0.17 (versionCode 18) — 手动选歌大容量优化（尝试中）
+问题：用户手动选 4000+ 首歌时黑屏无响应。自动读取本地（MediaStore）正常。
+根因：	oSongObject() 对每个文件调 3 次 ContentResolver（queryDisplayName / queryMimeType / querySize），4000 文件 = 12000 次阻塞主线程 IO。
+待实施方案：pickAudioFilesResult 中判 getItemCount() > 500 走 	oSongObjectFast()——只从 URI 路径提取文件名和扩展名推断 MIME 类型，不碰 ContentResolver。
+实现工具踩坑：Java 源文件中文字面量在 PowerShell/Node.js 写入时被损坏导致编译失败。应在 Android Studio 中直接编辑。
+当前状态：代码已回滚到 v1.0.16 可编译基线，等待 Android Studio 手动补丁后发版。
+
