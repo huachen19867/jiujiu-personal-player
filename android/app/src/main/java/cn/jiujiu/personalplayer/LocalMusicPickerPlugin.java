@@ -156,18 +156,25 @@ public class LocalMusicPickerPlugin extends Plugin {
         return songs;
     }
 
-    private JSObject toSongObject(Uri uri) {
-        takePersistableReadPermission(uri);
+    private JSObject toSongObject(Uri uri) {        takePersistableReadPermission(uri);
 
-        String name = queryDisplayName(uri);
-        String type = queryMimeType(uri, name);
-        long size = querySize(uri);
+        String displayName = uri.getLastPathSegment();
+        String name = displayName == null ? "Local Audio" : displayName;
+        int slashIdx = name.lastIndexOf('/');
+        if (slashIdx >= 0) { name = name.substring(slashIdx + 1); }
+
+        String extension = MimeTypeMap.getFileExtensionFromUrl(name);
+        String type = "";
+        if (extension != null && !extension.isEmpty()) {
+            String extType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
+            if (extType != null) { type = extType; }
+        }
 
         JSObject song = new JSObject();
         song.put("id", "android-" + Math.abs(uri.toString().hashCode()) + "-" + System.nanoTime());
         song.put("name", name);
         song.put("type", type);
-        song.put("size", size);
+        song.put("size", 0);
         song.put("uri", uri.toString());
         return song;
     }
