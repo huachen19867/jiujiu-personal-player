@@ -13,7 +13,7 @@ interface PlaylistProps {
   onClear: () => void;
 }
 
-const VIRTUALIZE_THRESHOLD = 120;
+const VIRTUALIZE_THRESHOLD = 2500;
 const ROW_HEIGHT = 72;
 const OVERSCAN_ROWS = 8;
 
