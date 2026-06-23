@@ -11,6 +11,7 @@ import {
   createSongsFromFiles,
 } from './lib/musicFiles';
 import { getNativeMusicPicker } from './lib/nativeBridge';
+import { AUTO_LOCAL_PLAYLIST_ID } from './lib/storage';
 import './styles.css';
 
 function App() {
@@ -40,7 +41,8 @@ function App() {
     }
 
     try {
-      const result = await picker.pickAudioFiles();
+      const scanAudioFiles = player.activePlaylistId === AUTO_LOCAL_PLAYLIST_ID ? picker.scanAudioFiles : undefined;
+      const result = await (scanAudioFiles ? scanAudioFiles() : picker.pickAudioFiles());
       const songs = result.songs.map((asset, index) => createSongFromNativeAudio(asset, index));
       if (!songs.length) {
         return;
@@ -84,6 +86,7 @@ function App() {
               playbackMode={player.playbackMode}
               volume={player.volume}
               disabled={!player.currentSong}
+              playDisabled={!player.canPlay}
               onTogglePlay={player.togglePlay}
               onNext={player.next}
               onPrevious={player.previous}

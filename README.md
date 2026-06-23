@@ -33,7 +33,7 @@ npm run android:apk
 当前调试 APK 会复制到两个位置：
 
 - `C:\AI\Android\jiujiu-personal-player-debug.apk`
-- `C:\AI\Android\jiujiu-personal-player-v1.0.9-debug.apk`
+- `C:\AI\Android\jiujiu-personal-player-v1.0.13-debug.apk`
 
 优先把带版本号的文件发到 Android 手机，允许“安装未知来源应用”即可安装打开。后续每次发包都要递增 Android `versionCode`，否则部分手机可能不会把新包稳定识别为覆盖升级。
 
@@ -44,10 +44,11 @@ npm run android:apk
 ## 首版范围
 
 - PWA 播放器，最终以手机端窄屏触控体验为主，同时保留桌面调试布局。
-- Android App 内支持原生多选音频文件；网页/桌面调试环境回退到浏览器多选文件。
+- Android App 内支持原生多选音频文件，并提供“自动读取本地”歌单扫描手机媒体库；网页/桌面调试环境回退到浏览器多选文件。
 - 支持多歌单分离：当前歌单选过歌后，自动露出下一个空歌单。
 - 支持播放、暂停、上一首、下一首、进度拖动、音量、顺序/循环/随机模式。
 - 支持当前播放高亮、移除歌曲、清空列表。
+- 长歌单使用虚拟滚动，避免一次导入数千首时把手机 WebView 撑黑屏。
 - 播放列表元数据可保存到浏览器本地；音频文件本体不上传、不长期保存。
 
 ## 已知边界

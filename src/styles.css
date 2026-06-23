@@ -1040,6 +1040,10 @@ input[type='range'] {
   overflow-y: auto;
 }
 
+.playlist.is-virtualized {
+  max-height: min(620px, 68vh);
+}
+
 .song-row {
   min-height: 72px;
   display: grid;
@@ -1179,7 +1183,7 @@ input:focus-visible {
     grid-template-columns: 1fr;
   }
 
-  .playlist {
+  .playlist:not(.is-virtualized) {
     max-height: none;
   }
 }

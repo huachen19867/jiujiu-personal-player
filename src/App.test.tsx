@@ -231,6 +231,40 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: '歌单一：2 首歌' })).toBeInTheDocument();
   });
 
+  it('scans the Android media library from the auto local playlist tab', async () => {
+    const user = userEvent.setup();
+    const pickAudioFiles = vi.fn();
+    const scanAudioFiles = vi.fn().mockResolvedValue({
+      songs: [
+        {
+          id: 'auto-one',
+          name: '自动读取曲目.mp3',
+          type: 'audio/mpeg',
+          size: 2048,
+          uri: 'content://media/audio/auto-one',
+        },
+      ],
+    });
+    Object.defineProperty(globalThis, 'Capacitor', {
+      configurable: true,
+      value: {
+        Plugins: {
+          LocalMusicPicker: { pickAudioFiles, scanAudioFiles },
+        },
+      },
+    });
+
+    render(<App />);
+
+    await revealPlaylistActions(user, '自动读取本地');
+    await user.click(screen.getByRole('button', { name: '给自动读取本地添加歌曲' }));
+
+    expect(scanAudioFiles).toHaveBeenCalledTimes(1);
+    expect(pickAudioFiles).not.toHaveBeenCalled();
+    expect(await screen.findByRole('heading', { name: '自动读取本地：1 首歌' })).toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: '播放列表' })).getByText('自动读取曲目')).toBeInTheDocument();
+  });
+
   it('creates the next playlist after the current playlist receives songs', async () => {
     const user = userEvent.setup();
     const pickAudioFiles = vi
@@ -380,6 +414,43 @@ describe('App', () => {
     expect(screen.getByText('正在播放 歌单一')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '暂停' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: '纳入播放 歌单二' })).toBeChecked();
+  });
+
+  it('uses the play button to start a selected playback playlist even while viewing an empty playlist', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await uploadFilesToPlaylist(user, [
+      new File(['audio'], 'Blue Monday.mp3', { type: 'audio/mpeg' }),
+    ]);
+
+    await user.click(screen.getByRole('button', { name: '查看 歌单二' }));
+    expect(screen.getByRole('heading', { name: '歌单二：0 首歌' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '播放' }));
+
+    expect(await screen.findByText('正在播放 歌单一')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Blue Monday' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '暂停' })).toBeInTheDocument();
+  });
+
+  it('virtualizes very large playlists instead of rendering every song row', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await uploadFilesToPlaylist(
+      user,
+      Array.from({ length: 4000 }, (_, index) =>
+        new File(['audio'], `Track ${String(index + 1).padStart(4, '0')}.mp3`, { type: 'audio/mpeg' }),
+      ),
+    );
+
+    const playlist = await screen.findByRole('list', { name: '播放列表' });
+
+    expect(screen.getByRole('heading', { name: '歌单一：4000 首歌' })).toBeInTheDocument();
+    expect(within(playlist).getByText('Track 0001')).toBeInTheDocument();
+    expect(within(playlist).queryByText('Track 4000')).not.toBeInTheDocument();
+    expect(within(playlist).getAllByRole('listitem').length).toBeLessThan(80);
   });
 
   it('closes the playback range menu after tapping outside it', async () => {

@@ -476,6 +476,45 @@ describe('useMusicPlayer', () => {
     expect(result.current.currentSong?.id).toBe('two');
   });
 
+  it('starts playback from a selected playback playlist while the viewed playlist is empty', async () => {
+    const { result } = renderHook(() => useMusicPlayer());
+
+    act(() => result.current.addSongs([makeSong('one')]));
+    act(() => result.current.selectPlaylist('playlist-2'));
+
+    await act(async () => {
+      await result.current.togglePlay();
+    });
+
+    expect(result.current.activePlaylistId).toBe('playlist-2');
+    expect(result.current.currentPlaylistId).toBe('playlist-1');
+    expect(result.current.currentSong?.id).toBe('one');
+    expect(result.current.isPlaying).toBe(true);
+    expect(audioInstances[0].play).toHaveBeenCalledTimes(1);
+  });
+
+  it('reshuffles the playback queue when entering shuffle mode', () => {
+    const { result } = renderHook(() => useMusicPlayer());
+    const random = vi.spyOn(Math, 'random');
+    random.mockReturnValueOnce(0.9).mockReturnValueOnce(0.2);
+
+    act(() => result.current.addSongs([makeSong('one'), makeSong('two'), makeSong('three')]));
+    act(() => result.current.setPlaybackMode('repeat-one'));
+    act(() => result.current.cycleMode());
+
+    expect(result.current.playbackMode).toBe('shuffle');
+    expect(result.current.currentSong?.id).toBe('three');
+
+    random.mockReturnValueOnce(0.1).mockReturnValueOnce(0.8);
+    act(() => result.current.setPlaybackMode('repeat-one'));
+    act(() => result.current.cycleMode());
+
+    expect(result.current.playbackMode).toBe('shuffle');
+    expect(result.current.currentSong?.id).toBe('one');
+
+    random.mockRestore();
+  });
+
   it('continues into another selected playlist after the current playlist is unchecked', async () => {
     const { result } = renderHook(() => useMusicPlayer());
 
@@ -534,7 +573,7 @@ describe('useMusicPlayer', () => {
     act(() => result.current.addSongs([makeSong('one')]));
     act(() => result.current.renamePlaylist('playlist-1', '古风'));
 
-    expect(result.current.playlistGroups[0].name).toBe('古风');
+    expect(result.current.playlistGroups.find((playlist) => playlist.id === 'playlist-1')?.name).toBe('古风');
     expect(result.current.activePlaylistName).toBe('古风');
     expect(result.current.songs.map((song) => song.id)).toEqual(['one']);
   });

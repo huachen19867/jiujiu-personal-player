@@ -2,6 +2,7 @@ import type { NativeAudioAsset } from './musicFiles';
 
 export interface NativeMusicPickerPlugin {
   pickAudioFiles: () => Promise<{ songs: NativeAudioAsset[] }>;
+  scanAudioFiles?: () => Promise<{ songs: NativeAudioAsset[] }>;
 }
 
 export interface NativeAudioQueueItem {

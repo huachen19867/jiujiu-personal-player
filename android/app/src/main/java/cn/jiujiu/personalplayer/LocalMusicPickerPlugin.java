@@ -1,22 +1,35 @@
 package cn.jiujiu.personalplayer;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
+import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.webkit.MimeTypeMap;
 import androidx.activity.result.ActivityResult;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
-@CapacitorPlugin(name = "LocalMusicPicker")
+@CapacitorPlugin(
+    name = "LocalMusicPicker",
+    permissions = {
+        @Permission(strings = { Manifest.permission.READ_MEDIA_AUDIO }, alias = "audio"),
+        @Permission(strings = { Manifest.permission.READ_EXTERNAL_STORAGE }, alias = "legacyAudio")
+    }
+)
 public class LocalMusicPickerPlugin extends Plugin {
     private static final String[] AUDIO_MIME_TYPES = {
         "audio/mpeg",
@@ -39,6 +52,27 @@ public class LocalMusicPickerPlugin extends Plugin {
         intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
 
         startActivityForResult(call, intent, "pickAudioFilesResult");
+    }
+
+    @PluginMethod
+    public void scanAudioFiles(PluginCall call) {
+        String permissionAlias = getAudioPermissionAlias();
+        if (getPermissionState(permissionAlias) != PermissionState.GRANTED) {
+            requestPermissionForAlias(permissionAlias, call, "scanAudioFilesPermissionResult");
+            return;
+        }
+
+        resolveScannedAudioFiles(call);
+    }
+
+    @PermissionCallback
+    private void scanAudioFilesPermissionResult(PluginCall call) {
+        if (getPermissionState(getAudioPermissionAlias()) != PermissionState.GRANTED) {
+            call.reject("Audio library permission denied");
+            return;
+        }
+
+        resolveScannedAudioFiles(call);
     }
 
     @ActivityCallback
@@ -68,6 +102,60 @@ public class LocalMusicPickerPlugin extends Plugin {
         call.resolve(payload);
     }
 
+    private void resolveScannedAudioFiles(PluginCall call) {
+        JSObject payload = new JSObject();
+        payload.put("songs", scanMediaStoreAudioFiles());
+        call.resolve(payload);
+    }
+
+    private JSArray scanMediaStoreAudioFiles() {
+        JSArray songs = new JSArray();
+        ContentResolver resolver = getContext().getContentResolver();
+        Uri collection =
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                ? MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+                : MediaStore.Audio.Media.EXTERNAL_CONTENT_URI;
+        String[] projection = {
+            MediaStore.Audio.Media._ID,
+            MediaStore.Audio.Media.DISPLAY_NAME,
+            MediaStore.Audio.Media.MIME_TYPE,
+            MediaStore.Audio.Media.SIZE,
+            MediaStore.Audio.Media.DURATION
+        };
+        String selection = MediaStore.Audio.Media.IS_MUSIC + " != 0";
+        String sortOrder = MediaStore.Audio.Media.DATE_ADDED + " DESC";
+
+        try (Cursor cursor = resolver.query(collection, projection, selection, null, sortOrder)) {
+            if (cursor == null) {
+                return songs;
+            }
+
+            int idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID);
+            int nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME);
+            int typeColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.MIME_TYPE);
+            int sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE);
+            int durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION);
+
+            while (cursor.moveToNext()) {
+                long id = cursor.getLong(idColumn);
+                Uri contentUri = ContentUris.withAppendedId(collection, id);
+                JSObject song = new JSObject();
+                song.put("id", "android-media-" + id);
+                song.put("name", readString(cursor, nameColumn, "本地音频"));
+                song.put("type", readString(cursor, typeColumn, "audio/*"));
+                song.put("size", readLong(cursor, sizeColumn));
+                song.put("uri", contentUri.toString());
+                long durationMs = readLong(cursor, durationColumn);
+                if (durationMs > 0) {
+                    song.put("duration", durationMs / 1000.0);
+                }
+                songs.put(song);
+            }
+        }
+
+        return songs;
+    }
+
     private JSObject toSongObject(Uri uri) {
         takePersistableReadPermission(uri);
 
@@ -82,6 +170,27 @@ public class LocalMusicPickerPlugin extends Plugin {
         song.put("size", size);
         song.put("uri", uri.toString());
         return song;
+    }
+
+    private String getAudioPermissionAlias() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ? "audio" : "legacyAudio";
+    }
+
+    private String readString(Cursor cursor, int columnIndex, String fallback) {
+        if (columnIndex < 0 || cursor.isNull(columnIndex)) {
+            return fallback;
+        }
+
+        String value = cursor.getString(columnIndex);
+        return value == null || value.trim().isEmpty() ? fallback : value;
+    }
+
+    private long readLong(Cursor cursor, int columnIndex) {
+        if (columnIndex < 0 || cursor.isNull(columnIndex)) {
+            return 0;
+        }
+
+        return cursor.getLong(columnIndex);
     }
 
     private void takePersistableReadPermission(Uri uri) {

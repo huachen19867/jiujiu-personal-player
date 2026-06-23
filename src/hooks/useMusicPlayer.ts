@@ -2,7 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getNativeAudioPlayer } from '../lib/nativeBridge';
 import type { NativeAudioPlayerEventPayload, NativeAudioQueueItem } from '../lib/nativeBridge';
 import { getNextIndex, getPreviousIndex } from '../lib/playbackQueue';
-import { DEFAULT_PLAYLIST_ID, DEFAULT_PLAYLIST_NAME, loadLibraryState, saveLibraryState } from '../lib/storage';
+import {
+  AUTO_LOCAL_PLAYLIST_ID,
+  AUTO_LOCAL_PLAYLIST_NAME,
+  DEFAULT_PLAYLIST_ID,
+  DEFAULT_PLAYLIST_NAME,
+  loadLibraryState,
+  saveLibraryState,
+} from '../lib/storage';
 import type { PlaybackMode, PlaylistGroup, Song, StoredPlaylistGroup, StoredSong } from '../types/music';
 
 const MODE_ORDER: PlaybackMode[] = ['sequence', 'repeat-all', 'repeat-one', 'shuffle'];
@@ -50,6 +57,7 @@ export function useMusicPlayer() {
   const volumeRef = useRef(savedState.volume);
   const playlistChangedInSessionRef = useRef(false);
   const playSelectedSongRef = useRef(false);
+  const shuffledPlaybackQueueRef = useRef<PlaybackQueueEntry[] | null>(null);
   const nativeLoadedSongIdRef = useRef<string | null>(null);
 
   const activePlaylist = useMemo(
@@ -64,6 +72,11 @@ export function useMusicPlayer() {
   const currentSongs = currentPlaylist?.songs ?? [];
   const currentSong = currentIndex === null ? null : currentSongs[currentIndex] ?? null;
   const totalSongCount = playlistGroups.reduce((sum, playlist) => sum + playlist.songs.length, 0);
+  const playbackQueue = useMemo(
+    () => createPlaybackQueue(playlistGroups, selectedPlaybackPlaylistIds, currentPlaylist?.id ?? DEFAULT_PLAYLIST_ID),
+    [currentPlaylist?.id, playlistGroups, selectedPlaybackPlaylistIds],
+  );
+  const canPlay = playbackQueue.length > 0;
   const rememberedSongCount =
     totalSongCount === 0 && !playlistChangedInSessionRef.current ? restoredLibrary.unrestorableSongCount : 0;
 
@@ -231,6 +244,38 @@ export function useMusicPlayer() {
     setIsPlaying(false);
   }, [audio, nativeAudioPlayer]);
 
+  const getPlaybackQueueFromRefs = useCallback(
+    () =>
+      createPlaybackQueue(
+        playlistGroupsRef.current,
+        selectedPlaybackPlaylistIdsRef.current,
+        currentPlaylistIdRef.current,
+      ),
+    [],
+  );
+
+  const createAndStoreShuffleQueue = useCallback(
+    (preferredFirstSongId?: string | null) => {
+      const queue = createShuffledPlaybackQueue(getPlaybackQueueFromRefs(), preferredFirstSongId);
+      shuffledPlaybackQueueRef.current = queue;
+      return queue;
+    },
+    [getPlaybackQueueFromRefs],
+  );
+
+  const getEffectivePlaybackQueueFromRefs = useCallback(() => {
+    const queue = getPlaybackQueueFromRefs();
+    if (playbackModeRef.current !== 'shuffle') {
+      return queue;
+    }
+
+    if (shuffledPlaybackQueueRef.current && hasSameQueueSongs(shuffledPlaybackQueueRef.current, queue)) {
+      return shuffledPlaybackQueueRef.current;
+    }
+
+    return createAndStoreShuffleQueue(currentSongRef.current?.id);
+  }, [createAndStoreShuffleQueue, getPlaybackQueueFromRefs]);
+
   const moveToQueueEntry = useCallback((entry: PlaybackQueueEntry | null, shouldKeepPlaying: boolean) => {
     if (!entry) {
       setIsPlaying(false);
@@ -252,18 +297,15 @@ export function useMusicPlayer() {
         return;
       }
 
-      const queue = createPlaybackQueue(
-        playlistGroupsRef.current,
-        selectedPlaybackPlaylistIdsRef.current,
-        currentPlaylistIdRef.current,
-      );
+      const queue = getEffectivePlaybackQueueFromRefs();
       const queueIndex = queue.findIndex((entry) => entry.song.id === currentSong.id);
+      const queuePlaybackMode = playbackModeRef.current === 'shuffle' ? 'repeat-all' : playbackModeRef.current;
 
       if (queueIndex >= 0) {
         const nextQueueIndex =
           direction === 1
-            ? getNextIndex(queueIndex, queue.length, playbackModeRef.current)
-            : getPreviousIndex(queueIndex, queue.length, playbackModeRef.current);
+            ? getNextIndex(queueIndex, queue.length, queuePlaybackMode)
+            : getPreviousIndex(queueIndex, queue.length, queuePlaybackMode);
         moveToQueueEntry(nextQueueIndex === null ? null : queue[nextQueueIndex], shouldKeepPlaying);
         return;
       }
@@ -281,8 +323,8 @@ export function useMusicPlayer() {
       const songs = currentSongsRef.current;
       const nextIndex =
         direction === 1
-          ? getNextIndex(currentIndex, songs.length, playbackModeRef.current)
-          : getPreviousIndex(currentIndex, songs.length, playbackModeRef.current);
+          ? getNextIndex(currentIndex, songs.length, queuePlaybackMode)
+          : getPreviousIndex(currentIndex, songs.length, queuePlaybackMode);
       moveToQueueEntry(
         nextIndex === null
           ? null
@@ -294,7 +336,7 @@ export function useMusicPlayer() {
         shouldKeepPlaying,
       );
     },
-    [moveToQueueEntry],
+    [getEffectivePlaybackQueueFromRefs, moveToQueueEntry],
   );
 
   const advanceAfterTrackEnd = useCallback(() => {
@@ -513,6 +555,9 @@ export function useMusicPlayer() {
 
   const play = useCallback(async () => {
     if (!currentSong) {
+      const queue =
+        playbackModeRef.current === 'shuffle' ? getEffectivePlaybackQueueFromRefs() : getPlaybackQueueFromRefs();
+      moveToQueueEntry(queue[0] ?? null, true);
       return;
     }
 
@@ -531,7 +576,7 @@ export function useMusicPlayer() {
       setIsPlaying(false);
       setErrorMessage('这首歌暂时播放不了，可能是格式或编码不受当前手机支持。');
     }
-  }, [audio, currentSong, nativeAudioPlayer]);
+  }, [audio, currentSong, getEffectivePlaybackQueueFromRefs, getPlaybackQueueFromRefs, moveToQueueEntry, nativeAudioPlayer]);
 
   const togglePlay = useCallback(() => {
     if (isPlaying) {
@@ -624,8 +669,20 @@ export function useMusicPlayer() {
   }, []);
 
   const cycleMode = useCallback(() => {
-    setPlaybackMode((mode) => MODE_ORDER[(MODE_ORDER.indexOf(mode) + 1) % MODE_ORDER.length]);
-  }, []);
+    const nextMode = MODE_ORDER[(MODE_ORDER.indexOf(playbackModeRef.current) + 1) % MODE_ORDER.length];
+    playbackModeRef.current = nextMode;
+
+    if (nextMode === 'shuffle') {
+      const queue = createAndStoreShuffleQueue(isPlaying ? currentSongRef.current?.id : null);
+      if ((!isPlaying || !currentSongRef.current) && queue.length) {
+        moveToQueueEntry(queue[0], false);
+      }
+    } else {
+      shuffledPlaybackQueueRef.current = null;
+    }
+
+    setPlaybackMode(nextMode);
+  }, [createAndStoreShuffleQueue, isPlaying, moveToQueueEntry]);
 
   const removeSongs = useCallback(
     (songIds: string[]) => {
@@ -717,6 +774,7 @@ export function useMusicPlayer() {
     currentSong,
     currentIndex,
     totalSongCount,
+    canPlay,
     isPlaying,
     currentTime,
     duration,
@@ -762,7 +820,10 @@ function restoreLibrary(
   });
 
   const playlists = ensureTrailingEmptyPlaylist(restoredPlaylists);
-  const activePlaylist = playlists.find((playlist) => playlist.id === storedActivePlaylistId) ?? playlists[0];
+  const activePlaylist =
+    playlists.find((playlist) => playlist.id === storedActivePlaylistId) ??
+    playlists.find((playlist) => playlist.id === DEFAULT_PLAYLIST_ID) ??
+    playlists[0];
   const playlistWithSavedSong = playlists.find((playlist) =>
     playlist.songs.some((song) => song.id === storedCurrentSongId),
   );
@@ -799,11 +860,17 @@ function restoreStoredSong(song: StoredSong): Song | null {
 }
 
 function ensureTrailingEmptyPlaylist(playlists: PlaylistGroup[]): PlaylistGroup[] {
-  const normalized = playlists.length ? playlists : [createEmptyPlaylist(0)];
-  const lastFilledIndex = normalized.reduce((lastIndex, playlist, index) => (playlist.songs.length ? index : lastIndex), -1);
+  const autoLocalPlaylist =
+    playlists.find((playlist) => playlist.id === AUTO_LOCAL_PLAYLIST_ID) ?? createAutoLocalPlaylist();
+  const regularPlaylists = playlists.filter((playlist) => playlist.id !== AUTO_LOCAL_PLAYLIST_ID);
+  const normalized = regularPlaylists.length ? regularPlaylists : [createEmptyPlaylist(0)];
+  const lastFilledIndex = normalized.reduce(
+    (lastIndex, playlist, index) => (playlist.songs.length ? index : lastIndex),
+    -1,
+  );
   const visibleCount = Math.max(1, lastFilledIndex + 2);
 
-  return Array.from({ length: visibleCount }, (_, index) => {
+  const visibleRegularPlaylists = Array.from({ length: visibleCount }, (_, index) => {
     const playlist = normalized[index] ?? createEmptyPlaylist(index);
     return {
       ...playlist,
@@ -811,6 +878,23 @@ function ensureTrailingEmptyPlaylist(playlists: PlaylistGroup[]): PlaylistGroup[
       name: playlist.name || createPlaylistName(index),
     };
   });
+
+  return [
+    {
+      ...autoLocalPlaylist,
+      id: AUTO_LOCAL_PLAYLIST_ID,
+      name: autoLocalPlaylist.name || AUTO_LOCAL_PLAYLIST_NAME,
+    },
+    ...visibleRegularPlaylists,
+  ];
+}
+
+function createAutoLocalPlaylist(): PlaylistGroup {
+  return {
+    id: AUTO_LOCAL_PLAYLIST_ID,
+    name: AUTO_LOCAL_PLAYLIST_NAME,
+    songs: [],
+  };
 }
 
 function createEmptyPlaylist(index: number): PlaylistGroup {
@@ -859,6 +943,43 @@ function createPlaybackQueue(
         }))
       : [],
   );
+}
+
+function createShuffledPlaybackQueue(queue: PlaybackQueueEntry[], preferredFirstSongId?: string | null) {
+  if (queue.length <= 1) {
+    return queue;
+  }
+
+  const pending = [...queue];
+  let firstEntry: PlaybackQueueEntry | undefined;
+
+  if (preferredFirstSongId) {
+    const preferredIndex = pending.findIndex((entry) => entry.song.id === preferredFirstSongId);
+    if (preferredIndex >= 0) {
+      firstEntry = pending.splice(preferredIndex, 1)[0];
+    }
+  }
+
+  if (!firstEntry) {
+    const firstIndex = Math.min(Math.floor(Math.random() * pending.length), pending.length - 1);
+    firstEntry = pending.splice(firstIndex, 1)[0];
+  }
+
+  for (let index = pending.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.min(Math.floor(Math.random() * (index + 1)), index);
+    [pending[index], pending[swapIndex]] = [pending[swapIndex], pending[index]];
+  }
+
+  return [firstEntry, ...pending];
+}
+
+function hasSameQueueSongs(left: PlaybackQueueEntry[], right: PlaybackQueueEntry[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const rightSongIds = new Set(right.map((entry) => entry.song.id));
+  return left.every((entry) => rightSongIds.has(entry.song.id));
 }
 
 function createNativePlaybackQueueOptions(

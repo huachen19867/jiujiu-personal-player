@@ -9,6 +9,7 @@ interface TransportControlsProps {
   playbackMode: PlaybackMode;
   volume: number;
   disabled: boolean;
+  playDisabled?: boolean;
   onTogglePlay: () => void;
   onNext: () => void;
   onPrevious: () => void;
@@ -31,6 +32,7 @@ export function TransportControls({
   playbackMode,
   volume,
   disabled,
+  playDisabled = disabled,
   onTogglePlay,
   onNext,
   onPrevious,
@@ -61,7 +63,7 @@ export function TransportControls({
         <button type="button" aria-label="上一首" disabled={disabled} onClick={onPrevious}>
           <SkipBack aria-hidden="true" size={23} />
         </button>
-        <button className="play-button" type="button" aria-label={isPlaying ? '暂停' : '播放'} disabled={disabled} onClick={onTogglePlay}>
+        <button className="play-button" type="button" aria-label={isPlaying ? '暂停' : '播放'} disabled={playDisabled} onClick={onTogglePlay}>
           {isPlaying ? <Pause aria-hidden="true" size={30} /> : <Play aria-hidden="true" size={30} />}
         </button>
         <button type="button" aria-label="下一首" disabled={disabled} onClick={onNext}>

@@ -2,6 +2,8 @@ import type { LibraryState, PlaybackMode, Song, StoredPlaylistGroup, StoredSong 
 import { APP_BRAND } from '../config/brand';
 
 export const LIBRARY_STORAGE_KEY = APP_BRAND.storageKey;
+export const AUTO_LOCAL_PLAYLIST_ID = 'auto-local';
+export const AUTO_LOCAL_PLAYLIST_NAME = '自动读取本地';
 export const DEFAULT_PLAYLIST_ID = 'playlist-1';
 export const DEFAULT_PLAYLIST_NAME = '歌单一';
 

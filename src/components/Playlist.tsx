@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckSquare, ChevronDown, ChevronUp, Play, Trash2, X } from 'lucide-react';
 import type { Song } from '../types/music';
 import { formatBytes, formatDuration } from '../lib/format';
@@ -13,12 +13,28 @@ interface PlaylistProps {
   onClear: () => void;
 }
 
+const VIRTUALIZE_THRESHOLD = 120;
+const ROW_HEIGHT = 72;
+const OVERSCAN_ROWS = 8;
+
 export function Playlist({ playlistName, songs, currentSongId, onPlaySong, onRemoveSong, onRemoveSongs, onClear }: PlaylistProps) {
+  const listRef = useRef<HTMLUListElement | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedSongIds, setSelectedSongIds] = useState<string[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [listViewportHeight, setListViewportHeight] = useState(0);
+  const [listScrollTop, setListScrollTop] = useState(0);
   const selectedCount = selectedSongIds.length;
   const selectedSongIdSet = useMemo(() => new Set(selectedSongIds), [selectedSongIds]);
+  const shouldVirtualize = songs.length > VIRTUALIZE_THRESHOLD;
+  const viewportHeight = listViewportHeight || Math.min(620, Math.max(1, songs.length) * ROW_HEIGHT);
+  const startIndex = shouldVirtualize ? Math.max(0, Math.floor(listScrollTop / ROW_HEIGHT) - OVERSCAN_ROWS) : 0;
+  const endIndex = shouldVirtualize
+    ? Math.min(songs.length, startIndex + Math.ceil(viewportHeight / ROW_HEIGHT) + OVERSCAN_ROWS * 2)
+    : songs.length;
+  const visibleSongs = shouldVirtualize ? songs.slice(startIndex, endIndex) : songs;
+  const virtualPaddingTop = shouldVirtualize ? startIndex * ROW_HEIGHT : 0;
+  const virtualPaddingBottom = shouldVirtualize ? Math.max(0, (songs.length - endIndex) * ROW_HEIGHT) : 0;
 
   useEffect(() => {
     setSelectedSongIds((ids) => ids.filter((id) => songs.some((song) => song.id === id)));
@@ -29,6 +45,27 @@ export function Playlist({ playlistName, songs, currentSongId, onPlaySong, onRem
       setSelectionMode(false);
     }
   }, [songs.length]);
+
+  useEffect(() => {
+    if (!shouldVirtualize) {
+      setListScrollTop(0);
+      setListViewportHeight(0);
+      return;
+    }
+
+    const updateViewportHeight = () => {
+      setListViewportHeight(listRef.current?.clientHeight ?? 0);
+    };
+
+    updateViewportHeight();
+    window.addEventListener('resize', updateViewportHeight);
+    return () => window.removeEventListener('resize', updateViewportHeight);
+  }, [shouldVirtualize]);
+
+  useEffect(() => {
+    setListScrollTop(0);
+    listRef.current?.scrollTo?.({ top: 0 });
+  }, [playlistName, songs.length]);
 
   const toggleSelectionMode = () => {
     setSelectionMode((enabled) => {
@@ -110,8 +147,27 @@ export function Playlist({ playlistName, songs, currentSongId, onPlaySong, onRem
       ) : null}
 
       {!isCollapsed ? (
-        <ul className="playlist" aria-label="播放列表">
-          {songs.map((song, index) => (
+        <ul
+          className={shouldVirtualize ? 'playlist is-virtualized' : 'playlist'}
+          aria-label="播放列表"
+          ref={listRef}
+          style={
+            shouldVirtualize
+              ? {
+                  paddingTop: virtualPaddingTop,
+                  paddingBottom: virtualPaddingBottom,
+                }
+              : undefined
+          }
+          onScroll={(event) => {
+            if (shouldVirtualize) {
+              setListScrollTop(event.currentTarget.scrollTop);
+            }
+          }}
+        >
+          {visibleSongs.map((song, offset) => {
+            const index = startIndex + offset;
+            return (
             <li
               className={[
                 'song-row',
@@ -151,7 +207,8 @@ export function Playlist({ playlistName, songs, currentSongId, onPlaySong, onRem
                 {selectionMode ? <X aria-hidden="true" size={17} /> : <Trash2 aria-hidden="true" size={17} />}
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       ) : null}
     </section>
