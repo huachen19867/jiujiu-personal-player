@@ -1042,6 +1042,8 @@ input[type='range'] {
 
 .playlist.is-virtualized {
   max-height: min(620px, 68vh);
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
 
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
