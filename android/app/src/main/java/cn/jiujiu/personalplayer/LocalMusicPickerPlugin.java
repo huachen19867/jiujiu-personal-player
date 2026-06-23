@@ -91,9 +91,11 @@ public class LocalMusicPickerPlugin extends Plugin {
             int count = data.getClipData().getItemCount();
             for (int index = 0; index < count; index++) {
                 Uri uri = data.getClipData().getItemAt(index).getUri();
+                if (count <= 500) { takePersistableReadPermission(uri); }
                 songs.put(toSongObject(uri));
             }
         } else if (data.getData() != null) {
+            takePersistableReadPermission(data.getData());
             songs.put(toSongObject(data.getData()));
         }
 
