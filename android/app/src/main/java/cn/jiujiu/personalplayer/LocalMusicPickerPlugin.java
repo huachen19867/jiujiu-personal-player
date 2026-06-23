@@ -87,13 +87,11 @@ public class LocalMusicPickerPlugin extends Plugin {
         }
 
         Intent data = result.getData();
-        boolean hasManyUris = data.getClipData() != null && data.getClipData().getItemCount() > 500;
-
         if (data.getClipData() != null) {
             int count = data.getClipData().getItemCount();
             for (int index = 0; index < count; index++) {
                 Uri uri = data.getClipData().getItemAt(index).getUri();
-                songs.put(hasManyUris ? toSongObjectFast(uri) : toSongObject(uri));
+                songs.put(toSongObject(uri));
             }
         } else if (data.getData() != null) {
             songs.put(toSongObject(data.getData()));
@@ -249,27 +247,3 @@ public class LocalMusicPickerPlugin extends Plugin {
         return extensionType == null ? "" : extensionType;
     }
 }
-    private JSObject toSongObjectFast(Uri uri) {
-        takePersistableReadPermission(uri);
-
-        String fileName = uri.getLastPathSegment();
-        if (fileName == null) { fileName = "本地音频"; }
-        String name = fileName;
-        int slashIdx = fileName.lastIndexOf('/');
-        if (slashIdx >= 0) { name = fileName.substring(slashIdx + 1); }
-
-        String extension = MimeTypeMap.getFileExtensionFromUrl(name);
-        String type = "";
-        if (extension != null && !extension.isEmpty()) {
-            String extType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
-            if (extType != null) { type = extType; }
-        }
-
-        JSObject song = new JSObject();
-        song.put("id", "android-" + Math.abs(uri.toString().hashCode()) + "-" + System.nanoTime());
-        song.put("name", name);
-        song.put("type", type);
-        song.put("size", 0);
-        song.put("uri", uri.toString());
-        return song;
-    }
