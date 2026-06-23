@@ -57,34 +57,45 @@ export function Playlist({ playlistName, songs, currentSongId, onPlaySong, onRem
     const ul = listRef.current;
     if (!ul) return;
 
-    const updateViewportHeight = () => {
-      listViewportHeightRef.current = ul.clientHeight;
+    function updateViewportHeight() {
+      const el = listRef.current;
+      listViewportHeightRef.current = el ? el.clientHeight : (window.innerHeight * 0.68);
       forceUpdate((n) => n + 1);
-    };
+    }
 
-    let observer: ResizeObserver | null = null;
+    let observer = null;
     if (typeof ResizeObserver !== 'undefined') {
       observer = new ResizeObserver(updateViewportHeight);
       observer.observe(ul);
+      updateViewportHeight();
     }
 
-    let rafId = 0;
-    let lastScrollTop = -1;
-    const onScroll = () => {
-      const st = ul.scrollTop;
-      if (st !== lastScrollTop) {
-        lastScrollTop = st;
-        listScrollTopRef.current = st;
-        forceUpdate((n) => n + 1);
-      }
-      rafId = requestAnimationFrame(onScroll);
-    };
+    var rafHandle = null as ReturnType<typeof requestAnimationFrame> | null;
+    var pendingUpdate = false as boolean;
+    function scheduleUpdate() {
+      if (pendingUpdate) return;
+      pendingUpdate = true;
+      rafHandle = requestAnimationFrame(function() {
+        pendingUpdate = false;
+        forceUpdate(function(n) { return n + 1; });
+      });
+    }
 
-    rafId = requestAnimationFrame(onScroll);
+    function handleScroll() {
+      var el = listRef.current;
+      if (!el) return;
+      var st = el.scrollTop;
+      if (st === listScrollTopRef.current) return;
+      listScrollTopRef.current = st;
+      scheduleUpdate();
+    }
 
-    return () => {
-      observer?.disconnect();
-      cancelAnimationFrame(rafId);
+    ul.addEventListener('scroll', handleScroll, { passive: true });
+
+    return function() {
+      if (observer) observer.disconnect();
+      if (rafHandle !== null) cancelAnimationFrame(rafHandle);
+      ul.removeEventListener('scroll', handleScroll);
     };
   }, [shouldVirtualize]);
 
@@ -185,7 +196,7 @@ export function Playlist({ playlistName, songs, currentSongId, onPlaySong, onRem
                 }
               : undefined
           }
-        >
+          >
           {visibleSongs.map((song, offset) => {
             const index = startIndex + offset;
             return (
