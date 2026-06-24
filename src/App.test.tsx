@@ -231,6 +231,34 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: '歌单一：2 首歌' })).toBeInTheDocument();
   });
 
+  it('shows the Android bulk-pick guard message when manual selection is too large', async () => {
+    const user = userEvent.setup();
+    const guardMessage = '一次手动选择的歌曲太多了，请用“自动读取本地”歌单读取手机音乐库。';
+    const pickAudioFiles = vi.fn().mockResolvedValue({
+      songs: [],
+      message: guardMessage,
+      tooMany: true,
+      count: 4000,
+    });
+    Object.defineProperty(globalThis, 'Capacitor', {
+      configurable: true,
+      value: {
+        Plugins: {
+          LocalMusicPicker: { pickAudioFiles },
+        },
+      },
+    });
+
+    render(<App />);
+
+    await revealPlaylistActions(user);
+    await user.click(screen.getByRole('button', { name: '给歌单一添加歌曲' }));
+
+    expect(pickAudioFiles).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText(guardMessage)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '歌单一：0 首歌' })).toBeInTheDocument();
+  });
+
   it('scans the Android media library from the auto local playlist tab', async () => {
     const user = userEvent.setup();
     const pickAudioFiles = vi.fn();

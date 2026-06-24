@@ -409,3 +409,15 @@ UI 结构上，`PlaylistSwitcher` 现在同时承担“查看/导入目标歌单
 - `cc -p` 和 `claude -p` 的只读项目审查在代理不稳定时容易超时（30–120 秒），适合做辅助判断但不宜作为自动化流程的唯一依据。长审查前先跑 `CC_OK`/`CLAUDE_OK` 最小探针确认代理可用。
 - `ZCode.exe --version` 无法在命令行静默执行，会启动 GUI 主程序。需要版本号时改查文件属性或注册表。
 - Node.js REPL 模式下 `Buffer.from(str, 'utf8')` + `fs.writeFileSync(path, result)` 是当前工具体系中最可靠的字节级写文件方式，特别是在 Windows 中文环境下操作包含中文的纯 UTF-8 文件时。
+
+# 2026-06-24 技术日志
+
+## v1.0.20：4000 首手动导入保护与 GitHub README 编码修复
+
+本轮先把两个长期缠绕的问题拆开处理。GitHub README 乱码不是 GitHub 页面或浏览器缓存问题，而是仓库里的 `README.md` 文件本身已经变成 mojibake；用 UTF-8 读取时能直接看到大量 `闁/鐎/閻/鈧` 等字符。处理方式是重写 README 为干净 UTF-8，并新增 `scripts/check-encoding.mjs`，通过 `git ls-files` 扫描仓库内文本文件，检测 `\uFFFD` 和高密度 mojibake 字符。以后推送前跑 `npm run check:encoding`，可以在本地提前拦住中文文档损坏。
+
+4000 首手动多选黑屏的根因不只在 React 列表渲染。此前已经绕开了逐文件 `ContentResolver` 查询，但 Android 文件选择器仍会把几千个 URI 一次性交给 App，原生层再一次性组装几千个 JS 对象回传 WebView，这条链路对低内存手机仍然危险。当前策略改为防御式处理：`LocalMusicPickerPlugin` 对手动 `ACTION_OPEN_DOCUMENT` 多选增加 `MANUAL_PICK_LIMIT=1200`，超过后不再继续组装歌曲对象，而是返回空 `songs`、`tooMany=true`、`count` 和明确提示“请用自动读取本地”。真正的大歌库导入边界交给“自动读取本地”，它走 Android MediaStore，一次查询媒体库，更适合 4000 首以上场景。
+
+前端同步补了提示透传：`NativeMusicPickerResult` 新增 `message/tooMany/count` 字段，`App.importNativeAudio()` 会先显示原生层返回的提示，再判断是否有歌曲。新增回归测试覆盖“原生手动多选返回超量保护消息时，App 显示提示且歌单仍为空”。这个测试先红后绿，避免以后又把空 songs 直接静默 return。
+
+版本递增到 `versionCode=21`、`versionName=1.0.20`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.20-debug.apk`。验证结果：`npm run check:encoding` 通过，扫描 62 个文本文件；`npm test -- --run` 6 个测试文件、57 条用例通过；`npm run build` 通过；`npm run android:apk` 通过并完成 Capacitor sync 与 Gradle `assembleDebug`；`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`versionCode=21`、`versionName=1.0.20`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。本次 APK SHA256 为 `98377F5A8A82177D33E285F422EEC44E7738DD542994D12E9798241832392F63`。

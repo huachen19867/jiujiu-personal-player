@@ -1,8 +1,15 @@
 import type { NativeAudioAsset } from './musicFiles';
 
+export interface NativeMusicPickerResult {
+  songs: NativeAudioAsset[];
+  message?: string;
+  tooMany?: boolean;
+  count?: number;
+}
+
 export interface NativeMusicPickerPlugin {
-  pickAudioFiles: () => Promise<{ songs: NativeAudioAsset[] }>;
-  scanAudioFiles?: () => Promise<{ songs: NativeAudioAsset[] }>;
+  pickAudioFiles: () => Promise<NativeMusicPickerResult>;
+  scanAudioFiles?: () => Promise<NativeMusicPickerResult>;
 }
 
 export interface NativeAudioQueueItem {

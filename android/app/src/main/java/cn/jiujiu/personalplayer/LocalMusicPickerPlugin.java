@@ -31,6 +31,8 @@ import com.getcapacitor.annotation.PermissionCallback;
     }
 )
 public class LocalMusicPickerPlugin extends Plugin {
+    private static final int MANUAL_PICK_LIMIT = 1200;
+    private static final String MANUAL_PICK_LIMIT_MESSAGE = "一次手动选择的歌曲太多了，请用“自动读取本地”歌单读取手机音乐库。";
     private static final String[] AUDIO_MIME_TYPES = {
         "audio/mpeg",
         "audio/mp4",
@@ -89,6 +91,11 @@ public class LocalMusicPickerPlugin extends Plugin {
         Intent data = result.getData();
         if (data.getClipData() != null) {
             int count = data.getClipData().getItemCount();
+            if (count > MANUAL_PICK_LIMIT) {
+                resolveManualPickLimit(call, count);
+                return;
+            }
+
             for (int index = 0; index < count; index++) {
                 Uri uri = data.getClipData().getItemAt(index).getUri();
                 if (count <= 500) { takePersistableReadPermission(uri); }
@@ -101,6 +108,15 @@ public class LocalMusicPickerPlugin extends Plugin {
 
         JSObject payload = new JSObject();
         payload.put("songs", songs);
+        call.resolve(payload);
+    }
+
+    private void resolveManualPickLimit(PluginCall call, int count) {
+        JSObject payload = new JSObject();
+        payload.put("songs", new JSArray());
+        payload.put("tooMany", true);
+        payload.put("count", count);
+        payload.put("message", MANUAL_PICK_LIMIT_MESSAGE);
         call.resolve(payload);
     }
 

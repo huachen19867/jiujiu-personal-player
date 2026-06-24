@@ -44,6 +44,9 @@ function App() {
       const scanAudioFiles = player.activePlaylistId === AUTO_LOCAL_PLAYLIST_ID ? picker.scanAudioFiles : undefined;
       const result = await (scanAudioFiles ? scanAudioFiles() : picker.pickAudioFiles());
       const songs = result.songs.map((asset, index) => createSongFromNativeAudio(asset, index));
+      if (result.message) {
+        setNotice(result.message);
+      }
       if (!songs.length) {
         return;
       }
