@@ -11,6 +11,7 @@ export const DEFAULT_LIBRARY_STATE: LibraryState = {
   playlists: [{ id: DEFAULT_PLAYLIST_ID, name: DEFAULT_PLAYLIST_NAME, songs: [] }],
   activePlaylistId: DEFAULT_PLAYLIST_ID,
   currentSongId: null,
+  selectedPlaybackPlaylistIds: [DEFAULT_PLAYLIST_ID],
   playbackMode: 'sequence',
   volume: 0.85,
 };
@@ -32,6 +33,7 @@ export function saveLibraryState(state: SaveableLibraryState) {
     ),
     activePlaylistId: state.activePlaylistId,
     currentSongId: state.currentSongId,
+    selectedPlaybackPlaylistIds: state.selectedPlaybackPlaylistIds,
     playbackMode: state.playbackMode,
     volume: state.volume,
   };
@@ -48,12 +50,20 @@ export function loadLibraryState(): LibraryState {
 
     const parsed = JSON.parse(raw) as unknown;
     if (isLibraryState(parsed)) {
+      const playlists = normalizeStoredPlaylists(parsed.playlists);
+      const activePlaylistId = playlists.some((playlist) => playlist.id === parsed.activePlaylistId)
+        ? parsed.activePlaylistId
+        : DEFAULT_PLAYLIST_ID;
+
       return {
         ...parsed,
-        playlists: normalizeStoredPlaylists(parsed.playlists),
-        activePlaylistId: parsed.playlists.some((playlist) => playlist.id === parsed.activePlaylistId)
-          ? parsed.activePlaylistId
-          : DEFAULT_PLAYLIST_ID,
+        playlists,
+        activePlaylistId,
+        selectedPlaybackPlaylistIds: normalizeSelectedPlaybackPlaylistIds(
+          parsed.selectedPlaybackPlaylistIds,
+          playlists,
+          activePlaylistId,
+        ),
       };
     }
 
@@ -68,6 +78,7 @@ export function loadLibraryState(): LibraryState {
         ]),
         activePlaylistId: DEFAULT_PLAYLIST_ID,
         currentSongId: parsed.currentSongId,
+        selectedPlaybackPlaylistIds: [DEFAULT_PLAYLIST_ID],
         playbackMode: parsed.playbackMode,
         volume: parsed.volume,
       };
@@ -98,12 +109,19 @@ function isLibraryState(value: unknown): value is LibraryState {
     return false;
   }
 
-  const candidate = value as LibraryState;
+  const candidate = value as LibraryState & { selectedPlaybackPlaylistIds?: unknown };
   return (
     Array.isArray(candidate.playlists) &&
     candidate.playlists.every(isStoredPlaylistGroup) &&
     typeof candidate.activePlaylistId === 'string' &&
     (typeof candidate.currentSongId === 'string' || candidate.currentSongId === null) &&
+    (
+      candidate.selectedPlaybackPlaylistIds === undefined ||
+      (
+        Array.isArray(candidate.selectedPlaybackPlaylistIds) &&
+        candidate.selectedPlaybackPlaylistIds.every((playlistId) => typeof playlistId === 'string')
+      )
+    ) &&
     PLAYBACK_MODES.has(candidate.playbackMode) &&
     typeof candidate.volume === 'number' &&
     candidate.volume >= 0 &&
@@ -162,4 +180,21 @@ function isStoredSong(value: unknown): value is StoredSong {
 
 function normalizeStoredPlaylists(playlists: StoredPlaylistGroup[]): StoredPlaylistGroup[] {
   return playlists.length ? playlists : DEFAULT_LIBRARY_STATE.playlists;
+}
+
+function normalizeSelectedPlaybackPlaylistIds(
+  selectedPlaybackPlaylistIds: unknown,
+  playlists: StoredPlaylistGroup[],
+  fallbackPlaylistId: string,
+) {
+  if (!Array.isArray(selectedPlaybackPlaylistIds)) {
+    return [fallbackPlaylistId];
+  }
+
+  const visiblePlaylistIds = new Set(playlists.map((playlist) => playlist.id));
+  const normalizedIds = selectedPlaybackPlaylistIds.filter(
+    (playlistId): playlistId is string => typeof playlistId === 'string' && visiblePlaylistIds.has(playlistId),
+  );
+
+  return normalizedIds.length ? Array.from(new Set(normalizedIds)) : [fallbackPlaylistId];
 }

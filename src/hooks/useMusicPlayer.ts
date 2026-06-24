@@ -32,14 +32,23 @@ type PlaybackQueueEntry = {
 export function useMusicPlayer() {
   const savedState = useMemo(() => loadLibraryState(), []);
   const restoredLibrary = useMemo(() => restoreLibrary(savedState.playlists, savedState.activePlaylistId, savedState.currentSongId), [savedState]);
+  const restoredSelectedPlaybackPlaylistIds = useMemo(
+    () =>
+      normalizeRestoredPlaybackPlaylistIds(
+        savedState.selectedPlaybackPlaylistIds,
+        restoredLibrary.playlists,
+        restoredLibrary.currentPlaylistId,
+      ),
+    [restoredLibrary.currentPlaylistId, restoredLibrary.playlists, savedState.selectedPlaybackPlaylistIds],
+  );
   const nativeAudioPlayer = useMemo(() => getNativeAudioPlayer(), []);
   const [audio] = useState(() => new Audio());
   const [playlistGroups, setPlaylistGroups] = useState<PlaylistGroup[]>(restoredLibrary.playlists);
   const [activePlaylistId, setActivePlaylistId] = useState(restoredLibrary.activePlaylistId);
   const [currentPlaylistId, setCurrentPlaylistId] = useState(restoredLibrary.currentPlaylistId);
-  const [selectedPlaybackPlaylistIds, setSelectedPlaybackPlaylistIds] = useState<string[]>([
-    restoredLibrary.currentPlaylistId,
-  ]);
+  const [selectedPlaybackPlaylistIds, setSelectedPlaybackPlaylistIds] = useState<string[]>(
+    restoredSelectedPlaybackPlaylistIds,
+  );
   const [currentIndex, setCurrentIndex] = useState<number | null>(restoredLibrary.currentIndex);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -52,7 +61,7 @@ export function useMusicPlayer() {
   const currentSongRef = useRef<Song | null>(null);
   const currentIndexRef = useRef<number | null>(restoredLibrary.currentIndex);
   const currentPlaylistIdRef = useRef(restoredLibrary.currentPlaylistId);
-  const selectedPlaybackPlaylistIdsRef = useRef<string[]>([restoredLibrary.currentPlaylistId]);
+  const selectedPlaybackPlaylistIdsRef = useRef<string[]>(restoredSelectedPlaybackPlaylistIds);
   const playbackModeRef = useRef<PlaybackMode>(savedState.playbackMode);
   const volumeRef = useRef(savedState.volume);
   const playlistChangedInSessionRef = useRef(false);
@@ -426,6 +435,9 @@ export function useMusicPlayer() {
       playlists: shouldKeepUnrestorableSavedState ? savedState.playlists : playlistGroups,
       activePlaylistId: shouldKeepUnrestorableSavedState ? savedState.activePlaylistId : activePlaylistId,
       currentSongId: shouldKeepUnrestorableSavedState ? savedState.currentSongId : currentSong?.id ?? null,
+      selectedPlaybackPlaylistIds: shouldKeepUnrestorableSavedState
+        ? savedState.selectedPlaybackPlaylistIds
+        : selectedPlaybackPlaylistIds,
       playbackMode,
       volume,
     });
@@ -438,6 +450,8 @@ export function useMusicPlayer() {
     savedState.activePlaylistId,
     savedState.currentSongId,
     savedState.playlists,
+    savedState.selectedPlaybackPlaylistIds,
+    selectedPlaybackPlaylistIds,
     totalSongCount,
     volume,
   ]);
@@ -857,6 +871,16 @@ function restoreStoredSong(song: StoredSong): Song | null {
     album: song.album,
     duration: song.duration,
   };
+}
+
+function normalizeRestoredPlaybackPlaylistIds(
+  selectedPlaybackPlaylistIds: string[],
+  playlists: PlaylistGroup[],
+  fallbackPlaylistId: string,
+) {
+  const visibleIds = new Set(playlists.map((playlist) => playlist.id));
+  const filteredIds = selectedPlaybackPlaylistIds.filter((playlistId) => visibleIds.has(playlistId));
+  return filteredIds.length ? Array.from(new Set(filteredIds)) : [fallbackPlaylistId];
 }
 
 function ensureTrailingEmptyPlaylist(playlists: PlaylistGroup[]): PlaylistGroup[] {

@@ -421,3 +421,13 @@ UI 结构上，`PlaylistSwitcher` 现在同时承担“查看/导入目标歌单
 前端同步补了提示透传：`NativeMusicPickerResult` 新增 `message/tooMany/count` 字段，`App.importNativeAudio()` 会先显示原生层返回的提示，再判断是否有歌曲。新增回归测试覆盖“原生手动多选返回超量保护消息时，App 显示提示且歌单仍为空”。这个测试先红后绿，避免以后又把空 songs 直接静默 return。
 
 版本递增到 `versionCode=21`、`versionName=1.0.20`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.20-debug.apk`。验证结果：`npm run check:encoding` 通过，扫描 62 个文本文件；`npm test -- --run` 6 个测试文件、57 条用例通过；`npm run build` 通过；`npm run android:apk` 通过并完成 Capacitor sync 与 Gradle `assembleDebug`；`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`versionCode=21`、`versionName=1.0.20`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。本次 APK SHA256 为 `98377F5A8A82177D33E285F422EEC44E7738DD542994D12E9798241832392F63`。
+
+## v1.0.21：播放范围与播放模式重启还原
+
+本轮处理两个播放偏好类问题：退出重进后“当前播放”里勾选的歌单范围会被自动叉掉，以及乱序/循环等播放模式容易回到顺序。根因确认后拆成两层：播放模式字段 `playbackMode` 早已存在于 storage，但缺少覆盖“重启还原”的新回归测试；播放范围 `selectedPlaybackPlaylistIds` 则完全没有进入 `LibraryState`，所以重开后 `useMusicPlayer` 初始化只能退回 `[currentPlaylistId]`，表现为用户之前勾选的其他歌单被取消。
+
+修复方式：`LibraryState` 新增 `selectedPlaybackPlaylistIds` 字段；`saveLibraryState()` 写入该字段，`loadLibraryState()` 对旧版本数据兼容，缺字段时回退到当前/默认歌单，并过滤不存在的歌单 id。`useMusicPlayer` 初始化时用保存的播放范围恢复 `selectedPlaybackPlaylistIds` 和 ref，后续保存 effect 也把播放范围和 `playbackMode` 一起落盘。这样退出前如果勾选了“歌单一 + 歌单二”，并切到乱序，重开后仍会保留这两个状态。
+
+测试先红后绿：新增 storage 测试覆盖保存/读取 `selectedPlaybackPlaylistIds`；新增 hook 测试覆盖保存了两个歌单和 `shuffle` 后重启还原。验证结果：定向测试先失败于只还原 `['playlist-2']`，修复后通过；`npm test -- --run` 6 个测试文件、58 条用例通过；`npm run check:encoding` 通过，扫描 63 个文本文件；`npm run build` 通过；`npm run android:apk` 通过并完成 Capacitor sync 与 Gradle `assembleDebug`。
+
+发布版本递增到 `versionCode=22`、`versionName=1.0.21`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.21-debug.apk`。APK 复查结果：`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`versionCode=22`、`versionName=1.0.21`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。本次 APK SHA256 为 `B6B969275D30CE6B0A4BA3EBF798BBDF8C03EC066190FEA2910781CEB766C1B1`。

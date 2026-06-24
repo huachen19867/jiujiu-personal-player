@@ -63,7 +63,7 @@ npm run android:apk
 调试 APK 会复制到：
 
 - `C:\AI\Android\jiujiu-personal-player-debug.apk`
-- `C:\AI\Android\jiujiu-personal-player-v1.0.20-debug.apk`
+- `C:\AI\Android\jiujiu-personal-player-v1.0.21-debug.apk`
 
 ## 编码和提交
 

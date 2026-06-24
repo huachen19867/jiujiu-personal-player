@@ -43,6 +43,7 @@ export interface LibraryState {
   playlists: StoredPlaylistGroup[];
   activePlaylistId: string;
   currentSongId: string | null;
+  selectedPlaybackPlaylistIds: string[];
   playbackMode: PlaybackMode;
   volume: number;
 }

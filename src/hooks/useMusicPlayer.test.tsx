@@ -148,6 +148,56 @@ describe('useMusicPlayer', () => {
     expect(result.current.volume).toBe(0.6);
   });
 
+  it('restores the selected playback playlists and playback mode after restart', () => {
+    localStorage.setItem(
+      'jiujiu-personal-player-library-v1',
+      JSON.stringify({
+        playlists: [
+          {
+            id: 'playlist-1',
+            name: '歌单一',
+            songs: [
+              {
+                id: 'native-one',
+                name: 'Native One',
+                type: 'audio/mpeg',
+                size: 123,
+                source: 'android-native',
+                nativeUri: 'content://media/audio/native-one',
+              },
+            ],
+          },
+          {
+            id: 'playlist-2',
+            name: '歌单二',
+            songs: [
+              {
+                id: 'native-two',
+                name: 'Native Two',
+                type: 'audio/mpeg',
+                size: 456,
+                source: 'android-native',
+                nativeUri: 'content://media/audio/native-two',
+              },
+            ],
+          },
+        ],
+        activePlaylistId: 'playlist-2',
+        currentSongId: 'native-two',
+        selectedPlaybackPlaylistIds: ['playlist-1', 'playlist-2'],
+        playbackMode: 'shuffle',
+        volume: 0.6,
+      }),
+    );
+
+    const { result } = renderHook(() => useMusicPlayer());
+
+    expect(result.current.activePlaylistId).toBe('playlist-2');
+    expect(result.current.currentSong?.id).toBe('native-two');
+    expect(result.current.selectedPlaybackPlaylistIds).toEqual(['playlist-1', 'playlist-2']);
+    expect(result.current.playbackMode).toBe('shuffle');
+  });
+
   it('toggles play and pause through the audio element', async () => {
     const { result } = renderHook(() => useMusicPlayer());
     act(() => result.current.addSongs([makeSong('one')]));

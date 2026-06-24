@@ -25,6 +25,7 @@ describe('library storage', () => {
       playlists: [{ id: 'playlist-1', name: '歌单一', songs: [makeSong({ duration: 182 })] }],
       activePlaylistId: 'playlist-1',
       currentSongId: 'song-1',
+      selectedPlaybackPlaylistIds: ['playlist-1'],
       playbackMode: 'shuffle',
       volume: 0.42,
     });
@@ -33,17 +34,19 @@ describe('library storage', () => {
 
     expect(raw).toContain('"name":"Track"');
     expect(raw).toContain('"playlists"');
+    expect(raw).toContain('"selectedPlaybackPlaylistIds":["playlist-1"]');
     expect(raw).toContain('"playbackMode":"shuffle"');
     expect(raw).not.toContain('blob:track');
   });
 
-  it('loads a valid saved playlist state', () => {
+  it('loads a valid saved playlist state with playback preferences', () => {
     localStorage.setItem(
       'jiujiu-personal-player-library-v1',
       JSON.stringify({
         playlists: [{ id: 'playlist-1', name: '歌单一', songs: [{ id: 'song-1', name: 'Track', type: 'audio/mpeg', size: 5 }] }],
         activePlaylistId: 'playlist-1',
         currentSongId: 'song-1',
+        selectedPlaybackPlaylistIds: ['playlist-1'],
         playbackMode: 'repeat-all',
         volume: 0.8,
       }),
@@ -53,6 +56,7 @@ describe('library storage', () => {
       playlists: [{ id: 'playlist-1', name: '歌单一', songs: [{ id: 'song-1', name: 'Track', type: 'audio/mpeg', size: 5 }] }],
       activePlaylistId: 'playlist-1',
       currentSongId: 'song-1',
+      selectedPlaybackPlaylistIds: ['playlist-1'],
       playbackMode: 'repeat-all',
       volume: 0.8,
     });
@@ -73,6 +77,7 @@ describe('library storage', () => {
       playlists: [{ id: 'playlist-1', name: '歌单一', songs: [{ id: 'song-1', name: 'Track' }] }],
       activePlaylistId: 'playlist-1',
       currentSongId: 'song-1',
+      selectedPlaybackPlaylistIds: ['playlist-1'],
     });
   });
 

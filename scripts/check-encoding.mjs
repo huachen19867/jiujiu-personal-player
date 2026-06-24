@@ -22,7 +22,8 @@ const TEXT_EXTENSIONS = new Set([
 ]);
 
 const TEXT_BASENAMES = new Set(['README', 'LICENSE']);
-const MOJIBAKE_CHAR_RE = /[闁鐎鎾濞閻鈧顑顤绋锛妫婵缁閸鐟濠瀹宕骞妤顒]/g;
+const MOJIBAKE_CHAR_RE =
+  /[\u95c1\u940e\u93be\u6fde\u95bb\u9227\u9851\u9864\u7ecb\u951b\u59ab\u5a75\u7f01\u95b8\u941f\u6fe0\u7039\u5b95\u9a9e\u59a4\u9852]/g;
 
 function isTextFile(filePath) {
   const base = path.basename(filePath);
@@ -53,7 +54,7 @@ for (const file of files) {
 }
 
 if (failed.length) {
-  console.error('疑似编码损坏文件：');
+  console.error('Potential mojibake files:');
   for (const item of failed) {
     console.error(`- ${item.file} (replacement=${item.replacementCount}, mojibake=${item.mojibakeCount})`);
   }
