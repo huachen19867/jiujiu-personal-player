@@ -17,7 +17,9 @@ import './styles.css';
 function App() {
   const player = useMusicPlayer();
   const [notice, setNotice] = useState<string | null>(null);
-  const nativeAudioImportSupported = Boolean(getNativeMusicPicker());
+  const nativeMusicPicker = getNativeMusicPicker();
+  const nativeAudioImportSupported = Boolean(nativeMusicPicker);
+  const nativeFolderImportSupported = Boolean(nativeMusicPicker?.pickAudioFolder);
   const reauthorizationNotice = player.rememberedSongCount
     ? `上次有 ${player.rememberedSongCount} 首旧版歌曲需要重新选一次；新版导入后会自动保留。`
     : null;
@@ -33,16 +35,24 @@ function App() {
     setNotice(null);
   };
 
-  const importNativeAudio = async () => {
+  const importNativeAudio = async (mode: 'files' | 'folder' = 'files') => {
     const picker = getNativeMusicPicker();
     if (!picker) {
       setNotice('当前环境没有安卓多选能力，请改用普通选歌。');
       return;
     }
 
+    if (mode === 'folder' && !picker.pickAudioFolder) {
+      setNotice('当前版本暂不支持文件夹导入，请改用选歌曲。');
+      return;
+    }
+
     try {
       const scanAudioFiles = player.activePlaylistId === AUTO_LOCAL_PLAYLIST_ID ? picker.scanAudioFiles : undefined;
-      const result = await (scanAudioFiles ? scanAudioFiles() : picker.pickAudioFiles());
+      const result =
+        mode === 'folder'
+          ? await picker.pickAudioFolder!()
+          : await (scanAudioFiles ? scanAudioFiles() : picker.pickAudioFiles());
       const songs = result.songs.map((asset, index) => createSongFromNativeAudio(asset, index));
       if (result.message) {
         setNotice(result.message);
@@ -52,9 +62,9 @@ function App() {
       }
 
       player.addSongs(songs);
-      setNotice(null);
+      setNotice(result.message ?? null);
     } catch {
-      setNotice('安卓多选导入失败，请改用普通选歌。');
+      setNotice(mode === 'folder' ? '文件夹导入失败，请改用选歌曲。' : '安卓多选导入失败，请改用普通选歌。');
     }
   };
 
@@ -103,8 +113,10 @@ function App() {
               activePlaylistId={player.activePlaylistId}
               notice={notice ?? player.errorMessage ?? reauthorizationNotice}
               nativeAudioImportSupported={nativeAudioImportSupported}
+              nativeFolderImportSupported={nativeFolderImportSupported}
               onFilesSelected={addFiles}
-              onNativeAudioImport={importNativeAudio}
+              onNativeAudioImport={() => importNativeAudio('files')}
+              onNativeFolderImport={() => importNativeAudio('folder')}
               onSelectPlaylist={player.selectPlaylist}
               onRenamePlaylist={player.renamePlaylist}
             />

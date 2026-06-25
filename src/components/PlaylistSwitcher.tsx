@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pencil, Plus } from 'lucide-react';
+import { FileMusic, FolderOpen, Pencil, Plus } from 'lucide-react';
 import type { PlaylistGroup } from '../types/music';
 
 interface PlaylistSwitcherProps {
@@ -7,8 +7,10 @@ interface PlaylistSwitcherProps {
   activePlaylistId: string;
   notice: string | null;
   nativeAudioImportSupported: boolean;
+  nativeFolderImportSupported: boolean;
   onFilesSelected: (files: FileList | File[]) => void;
   onNativeAudioImport: () => void;
+  onNativeFolderImport: () => void;
   onSelectPlaylist: (playlistId: string) => void;
   onRenamePlaylist: (playlistId: string, name: string) => void;
 }
@@ -18,13 +20,16 @@ export function PlaylistSwitcher({
   activePlaylistId,
   notice,
   nativeAudioImportSupported,
+  nativeFolderImportSupported,
   onFilesSelected,
   onNativeAudioImport,
+  onNativeFolderImport,
   onSelectPlaylist,
   onRenamePlaylist,
 }: PlaylistSwitcherProps) {
   const rootRef = useRef<HTMLElement>(null);
   const [actionPlaylistId, setActionPlaylistId] = useState<string | null>(null);
+  const [importMenuPlaylistId, setImportMenuPlaylistId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!actionPlaylistId) {
@@ -37,11 +42,13 @@ export function PlaylistSwitcher({
       }
 
       setActionPlaylistId(null);
+      setImportMenuPlaylistId(null);
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setActionPlaylistId(null);
+        setImportMenuPlaylistId(null);
       }
     };
 
@@ -57,8 +64,11 @@ export function PlaylistSwitcher({
   useEffect(() => {
     if (actionPlaylistId && !playlists.some((playlist) => playlist.id === actionPlaylistId)) {
       setActionPlaylistId(null);
+      setImportMenuPlaylistId(null);
     }
   }, [actionPlaylistId, playlists]);
+
+  const importMenuPlaylist = playlists.find((playlist) => playlist.id === importMenuPlaylistId) ?? null;
 
   return (
     <section className="playlist-switcher" aria-label="歌单切换" ref={rootRef}>
@@ -87,6 +97,7 @@ export function PlaylistSwitcher({
                   }
 
                   setActionPlaylistId(isActionOpen ? null : playlist.id);
+                  setImportMenuPlaylistId(null);
                 }}
               >
                 <span>{playlist.name}</span>
@@ -98,8 +109,9 @@ export function PlaylistSwitcher({
                   <button
                     className="playlist-tab-action playlist-tab-add"
                     type="button"
-                    aria-label={`给${playlist.name}添加歌曲`}
-                    onClick={onNativeAudioImport}
+                    aria-label={`打开${playlist.name}导入方式`}
+                    aria-expanded={importMenuPlaylistId === playlist.id}
+                    onClick={() => setImportMenuPlaylistId((id) => (id === playlist.id ? null : playlist.id))}
                   >
                     <Plus aria-hidden="true" size={15} />
                   </button>
@@ -145,6 +157,36 @@ export function PlaylistSwitcher({
         <p className="playlist-switcher-notice" role="status">
           {notice}
         </p>
+      ) : null}
+      {importMenuPlaylist ? (
+        <div className="playlist-import-menu" role="menu" aria-label={`${importMenuPlaylist.name}导入方式`}>
+          <button
+            type="button"
+            role="menuitem"
+            aria-label={`选歌曲导入${importMenuPlaylist.name}`}
+            onClick={() => {
+              setImportMenuPlaylistId(null);
+              onNativeAudioImport();
+            }}
+          >
+            <FileMusic aria-hidden="true" size={16} />
+            选歌曲
+          </button>
+          {nativeFolderImportSupported ? (
+            <button
+              type="button"
+              role="menuitem"
+              aria-label={`选文件夹导入${importMenuPlaylist.name}`}
+              onClick={() => {
+                setImportMenuPlaylistId(null);
+                onNativeFolderImport();
+              }}
+            >
+              <FolderOpen aria-hidden="true" size={16} />
+              选文件夹
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

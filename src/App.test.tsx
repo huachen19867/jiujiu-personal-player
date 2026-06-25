@@ -22,6 +22,12 @@ async function revealPlaylistActions(user: ReturnType<typeof userEvent.setup>, p
   await user.click(screen.getByRole('button', { name: `查看 ${playlistName}` }));
 }
 
+async function importNativeSongsToPlaylist(user: ReturnType<typeof userEvent.setup>, playlistName = '歌单一') {
+  await revealPlaylistActions(user, playlistName);
+  await user.click(screen.getByRole('button', { name: `打开${playlistName}导入方式` }));
+  await user.click(screen.getByRole('menuitem', { name: `选歌曲导入${playlistName}` }));
+}
+
 async function uploadFilesToPlaylist(
   user: ReturnType<typeof userEvent.setup>,
   files: File[],
@@ -221,14 +227,60 @@ describe('App', () => {
 
     render(<App />);
 
-    await revealPlaylistActions(user);
-    await user.click(screen.getByRole('button', { name: '给歌单一添加歌曲' }));
+    await importNativeSongsToPlaylist(user);
 
     expect(pickAudioFiles).toHaveBeenCalled();
     const playlist = screen.getByRole('list', { name: '播放列表' });
     expect(await within(playlist).findByText('白嫁衣')).toBeInTheDocument();
     expect(within(playlist).getByText('青花瓷')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '歌单一：2 首歌' })).toBeInTheDocument();
+  });
+
+  it('imports every Android folder song into the active playlist without splitting playlists', async () => {
+    const user = userEvent.setup();
+    const pickAudioFiles = vi.fn();
+    const pickAudioFolder = vi.fn().mockResolvedValue({
+      songs: [
+        {
+          id: 'folder-one',
+          name: '大文件夹/白嫁衣.mp3',
+          type: 'audio/mpeg',
+          size: 4096,
+          uri: 'content://tree/music/白嫁衣',
+        },
+        {
+          id: 'folder-two',
+          name: '大文件夹/子文件夹/青花瓷.mp3',
+          type: 'audio/mpeg',
+          size: 8192,
+          uri: 'content://tree/music/子文件夹/青花瓷',
+        },
+      ],
+      message: '已从文件夹导入 2 首歌。',
+    });
+    Object.defineProperty(globalThis, 'Capacitor', {
+      configurable: true,
+      value: {
+        Plugins: {
+          LocalMusicPicker: { pickAudioFiles, pickAudioFolder },
+        },
+      },
+    });
+
+    render(<App />);
+
+    await revealPlaylistActions(user);
+    await user.click(screen.getByRole('button', { name: '打开歌单一导入方式' }));
+    await user.click(screen.getByRole('menuitem', { name: '选文件夹导入歌单一' }));
+
+    expect(pickAudioFolder).toHaveBeenCalledTimes(1);
+    expect(pickAudioFiles).not.toHaveBeenCalled();
+    expect(await screen.findByText('已从文件夹导入 2 首歌。')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '歌单一：2 首歌' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查看 歌单二' })).toBeInTheDocument();
+    const playlist = screen.getByRole('list', { name: '播放列表' });
+    expect(within(playlist).getByText('大文件夹/白嫁衣')).toBeInTheDocument();
+    expect(within(playlist).getByText('大文件夹/子文件夹/青花瓷')).toBeInTheDocument();
   });
 
   it('shows the Android bulk-pick guard message when manual selection is too large', async () => {
@@ -251,8 +303,7 @@ describe('App', () => {
 
     render(<App />);
 
-    await revealPlaylistActions(user);
-    await user.click(screen.getByRole('button', { name: '给歌单一添加歌曲' }));
+    await importNativeSongsToPlaylist(user);
 
     expect(pickAudioFiles).toHaveBeenCalledTimes(1);
     expect(await screen.findByText(guardMessage)).toBeInTheDocument();
@@ -284,8 +335,7 @@ describe('App', () => {
 
     render(<App />);
 
-    await revealPlaylistActions(user, '自动读取本地');
-    await user.click(screen.getByRole('button', { name: '给自动读取本地添加歌曲' }));
+    await importNativeSongsToPlaylist(user, '自动读取本地');
 
     expect(scanAudioFiles).toHaveBeenCalledTimes(1);
     expect(pickAudioFiles).not.toHaveBeenCalled();
@@ -330,22 +380,22 @@ describe('App', () => {
 
     render(<App />);
 
-    await revealPlaylistActions(user);
-    await user.click(screen.getByRole('button', { name: '给歌单一添加歌曲' }));
+    await importNativeSongsToPlaylist(user);
     expect(await screen.findByRole('heading', { name: '歌单一：1 首歌' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '查看 歌单二' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '给歌单一添加歌曲' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '打开歌单一导入方式' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '重命名 歌单一' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '给歌单二添加歌曲' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '打开歌单二导入方式' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '重命名 歌单二' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '查看 歌单二' }));
     expect(screen.getByRole('heading', { name: '歌单二：0 首歌' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '给歌单二添加歌曲' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '打开歌单二导入方式' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '重命名 歌单二' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '给歌单一添加歌曲' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '打开歌单一导入方式' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: '给歌单二添加歌曲' }));
+    await user.click(screen.getByRole('button', { name: '打开歌单二导入方式' }));
+    await user.click(screen.getByRole('menuitem', { name: '选歌曲导入歌单二' }));
     expect(await screen.findByRole('heading', { name: '歌单二：1 首歌' })).toBeInTheDocument();
 
     expect(screen.getByRole('button', { name: '查看 歌单三' })).toBeInTheDocument();
@@ -427,14 +477,14 @@ describe('App', () => {
 
     render(<App />);
 
-    await revealPlaylistActions(user);
-    await user.click(screen.getByRole('button', { name: '给歌单一添加歌曲' }));
+    await importNativeSongsToPlaylist(user);
     await user.click(screen.getByRole('button', { name: '播放' }));
     expect(await screen.findByText('正在播放 歌单一')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '查看 歌单二' }));
-    expect(screen.getByRole('button', { name: '给歌单二添加歌曲' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '给歌单二添加歌曲' }));
+    expect(screen.getByRole('button', { name: '打开歌单二导入方式' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '打开歌单二导入方式' }));
+    await user.click(screen.getByRole('menuitem', { name: '选歌曲导入歌单二' }));
 
     await user.click(screen.getByRole('button', { name: '选择播放范围' }));
     await user.click(screen.getByRole('checkbox', { name: '纳入播放 歌单二' }));

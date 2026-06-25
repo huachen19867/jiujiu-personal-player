@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
+import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.webkit.MimeTypeMap;
@@ -22,6 +23,9 @@ import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
 
 @CapacitorPlugin(
     name = "LocalMusicPicker",
@@ -32,6 +36,7 @@ import com.getcapacitor.annotation.PermissionCallback;
 )
 public class LocalMusicPickerPlugin extends Plugin {
     private static final int MANUAL_PICK_LIMIT = 1200;
+    private static final int FOLDER_SCAN_LIMIT = 8000;
     private static final String MANUAL_PICK_LIMIT_MESSAGE = "一次手动选择的歌曲太多了，请用“自动读取本地”歌单读取手机音乐库。";
     private static final String[] AUDIO_MIME_TYPES = {
         "audio/mpeg",
@@ -54,6 +59,16 @@ public class LocalMusicPickerPlugin extends Plugin {
         intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
 
         startActivityForResult(call, intent, "pickAudioFilesResult");
+    }
+
+    @PluginMethod
+    public void pickAudioFolder(PluginCall call) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        intent.addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION);
+
+        startActivityForResult(call, intent, "pickAudioFolderResult");
     }
 
     @PluginMethod
@@ -120,6 +135,36 @@ public class LocalMusicPickerPlugin extends Plugin {
         call.resolve(payload);
     }
 
+    @ActivityCallback
+    private void pickAudioFolderResult(PluginCall call, ActivityResult result) {
+        JSArray songs = new JSArray();
+
+        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null || result.getData().getData() == null) {
+            JSObject payload = new JSObject();
+            payload.put("songs", songs);
+            call.resolve(payload);
+            return;
+        }
+
+        Uri treeUri = result.getData().getData();
+        takePersistableTreeReadPermission(treeUri);
+
+        try {
+            FolderScanState state = new FolderScanState();
+            String rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri);
+            Uri rootDocumentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocumentId);
+            scanDocumentTree(treeUri, rootDocumentUri, "", songs, state, new HashSet<>());
+
+            JSObject payload = new JSObject();
+            payload.put("songs", songs);
+            payload.put("count", state.count);
+            payload.put("message", createFolderImportMessage(state));
+            call.resolve(payload);
+        } catch (Exception exception) {
+            call.reject("Folder import failed", exception);
+        }
+    }
+
     private void resolveScannedAudioFiles(PluginCall call) {
         JSObject payload = new JSObject();
         payload.put("songs", scanMediaStoreAudioFiles());
@@ -174,6 +219,153 @@ public class LocalMusicPickerPlugin extends Plugin {
         return songs;
     }
 
+    private void scanDocumentTree(
+        Uri treeUri,
+        Uri documentUri,
+        String relativePath,
+        JSArray songs,
+        FolderScanState state,
+        Set<String> visitedDocumentIds
+    ) {
+        if (state.count >= FOLDER_SCAN_LIMIT) {
+            state.reachedLimit = true;
+            return;
+        }
+
+        String documentId = DocumentsContract.getDocumentId(documentUri);
+        if (!visitedDocumentIds.add(documentId)) {
+            return;
+        }
+
+        Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, documentId);
+        String[] projection = {
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE
+        };
+
+        try (Cursor cursor = getContext().getContentResolver().query(childrenUri, projection, null, null, null)) {
+            if (cursor == null) {
+                return;
+            }
+
+            int idColumn = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID);
+            int nameColumn = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME);
+            int typeColumn = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE);
+            int sizeColumn = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SIZE);
+
+            while (cursor.moveToNext()) {
+                if (state.count >= FOLDER_SCAN_LIMIT) {
+                    state.reachedLimit = true;
+                    return;
+                }
+
+                String childDocumentId = cursor.getString(idColumn);
+                String displayName = readString(cursor, nameColumn, "本地音频");
+                String mimeType = readString(cursor, typeColumn, "");
+                Uri childDocumentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, childDocumentId);
+
+                if (DocumentsContract.Document.MIME_TYPE_DIR.equals(mimeType)) {
+                    scanDocumentTree(
+                        treeUri,
+                        childDocumentUri,
+                        appendRelativePath(relativePath, displayName),
+                        songs,
+                        state,
+                        visitedDocumentIds
+                    );
+                    continue;
+                }
+
+                if (!isAudioDocument(displayName, mimeType)) {
+                    continue;
+                }
+
+                state.count += 1;
+                songs.put(toFolderSongObject(childDocumentUri, appendRelativeFileName(relativePath, displayName), mimeType, readLong(cursor, sizeColumn)));
+            }
+        }
+    }
+
+    private JSObject toFolderSongObject(Uri uri, String name, String mimeType, long size) {
+        JSObject song = new JSObject();
+        song.put("id", "android-folder-" + Math.abs(uri.toString().hashCode()));
+        song.put("name", name);
+        song.put("type", normalizeMimeType(name, mimeType));
+        song.put("size", size);
+        song.put("uri", uri.toString());
+        return song;
+    }
+
+    private String appendRelativePath(String relativePath, String folderName) {
+        return relativePath == null || relativePath.isEmpty() ? folderName : relativePath + "/" + folderName;
+    }
+
+    private String appendRelativeFileName(String relativePath, String fileName) {
+        return relativePath == null || relativePath.isEmpty() ? fileName : relativePath + "/" + fileName;
+    }
+
+    private boolean isAudioDocument(String name, String mimeType) {
+        if (mimeType != null && mimeType.startsWith("audio/")) {
+            return true;
+        }
+
+        return isSupportedAudioExtension(getExtension(name));
+    }
+
+    private boolean isSupportedAudioExtension(String extension) {
+        switch (extension) {
+            case "mp3":
+            case "flac":
+            case "wav":
+            case "m4a":
+            case "aac":
+            case "ogg":
+            case "opus":
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private String normalizeMimeType(String name, String mimeType) {
+        String extension = getExtension(name);
+        if (!extension.isEmpty()) {
+            String extensionType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
+            if (extensionType != null && extensionType.startsWith("audio/")) {
+                return extensionType;
+            }
+        }
+
+        return mimeType == null ? "" : mimeType;
+    }
+
+    private String getExtension(String name) {
+        if (name == null) {
+            return "";
+        }
+
+        int dotIndex = name.lastIndexOf('.');
+        if (dotIndex < 0 || dotIndex >= name.length() - 1) {
+            return "";
+        }
+
+        return name.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private String createFolderImportMessage(FolderScanState state) {
+        if (state.count <= 0) {
+            return "这个文件夹里没有找到可播放的音频。";
+        }
+
+        if (state.reachedLimit) {
+            return "已从文件夹导入前 " + state.count + " 首歌，文件夹里还有更多音频。";
+        }
+
+        return "已从文件夹导入 " + state.count + " 首歌。";
+    }
+
     private JSObject toSongObject(Uri uri) {
         String displayName = uri.getLastPathSegment();
         String name = displayName == null ? "Local Audio" : displayName;
@@ -225,6 +417,21 @@ public class LocalMusicPickerPlugin extends Plugin {
         } catch (SecurityException ignored) {
             // Some providers grant temporary read access only. The current playback session can still use it.
         }
+    }
+
+    private void takePersistableTreeReadPermission(Uri uri) {
+        try {
+            getContext()
+                .getContentResolver()
+                .takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (SecurityException ignored) {
+            // Some providers grant temporary tree access only. The current import session can still use it.
+        }
+    }
+
+    private static class FolderScanState {
+        int count = 0;
+        boolean reachedLimit = false;
     }
 
     private String queryDisplayName(Uri uri) {

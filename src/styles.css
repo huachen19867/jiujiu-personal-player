@@ -640,6 +640,34 @@ button:disabled {
   line-height: 1.45;
 }
 
+.playlist-import-menu {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.playlist-import-menu button {
+  min-width: 0;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(244, 119, 42, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 247, 239, 0.76);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+.playlist-import-menu button:hover {
+  border-color: rgba(244, 119, 42, 0.38);
+  background: rgba(255, 240, 224, 0.92);
+  color: var(--accent-strong);
+}
+
 .transport {
   padding: 20px;
 }

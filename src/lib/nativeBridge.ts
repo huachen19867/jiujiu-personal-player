@@ -9,6 +9,7 @@ export interface NativeMusicPickerResult {
 
 export interface NativeMusicPickerPlugin {
   pickAudioFiles: () => Promise<NativeMusicPickerResult>;
+  pickAudioFolder?: () => Promise<NativeMusicPickerResult>;
   scanAudioFiles?: () => Promise<NativeMusicPickerResult>;
 }
 

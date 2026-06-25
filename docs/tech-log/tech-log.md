@@ -431,3 +431,15 @@ UI 结构上，`PlaylistSwitcher` 现在同时承担“查看/导入目标歌单
 测试先红后绿：新增 storage 测试覆盖保存/读取 `selectedPlaybackPlaylistIds`；新增 hook 测试覆盖保存了两个歌单和 `shuffle` 后重启还原。验证结果：定向测试先失败于只还原 `['playlist-2']`，修复后通过；`npm test -- --run` 6 个测试文件、58 条用例通过；`npm run check:encoding` 通过，扫描 63 个文本文件；`npm run build` 通过；`npm run android:apk` 通过并完成 Capacitor sync 与 Gradle `assembleDebug`。
 
 发布版本递增到 `versionCode=22`、`versionName=1.0.21`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.21-debug.apk`。APK 复查结果：`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`versionCode=22`、`versionName=1.0.21`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。本次 APK SHA256 为 `B6B969275D30CE6B0A4BA3EBF798BBDF8C03EC066190FEA2910781CEB766C1B1`。
+
+# 2026-06-25 技术日志
+
+## v1.0.22：Android 文件夹递归导入
+
+本轮处理“多选太费事，能不能直接添加某个完整文件夹”的需求。产品边界定为：用户在当前歌单点加号后选择“选文件夹”，Android 原生层打开系统文件夹选择器；选中大文件夹后递归扫描其所有子文件夹，把识别到的音频统一加入当前歌单，不按子文件夹自动拆歌单。这样导入目标保持单一，避免“当前选的是歌单三，结果子文件夹被拆到歌单四/五”的隐性混乱。
+
+前端把原来的原生加号改成轻量导入菜单：`选歌曲` 继续走手动单选/多选，`选文件夹` 走新的 `pickAudioFolder()`。网页环境仍保留普通 `<input type="file" multiple>`，不再伪装成支持文件夹导入；文件夹能力只在 Android APK 内出现。新增回归测试覆盖：文件夹导入的歌曲进入当前歌单、不会自动创建拆分歌单、原生多选旧流程仍可用。
+
+Android 侧在 `LocalMusicPickerPlugin` 增加 `ACTION_OPEN_DOCUMENT_TREE`，拿到 tree URI 后用 `DocumentsContract.buildChildDocumentsUriUsingTree()` 递归查询子节点，支持 `mp3/flac/wav/m4a/aac/ogg/opus` 等常见扩展和 `audio/*` MIME；扫描上限设为 8000 首，超过后会提示“已导入前 N 首”。文件名保留相对路径，例如子文件夹中的歌会显示为 `子文件夹/歌名`，方便用户知道来源。
+
+验证结果：`npm test -- --run src/App.test.tsx -t "Android folder"` 通过；`npm test -- --run` 6 个测试文件、59 条用例通过；`npm run check:encoding` 通过，扫描 63 个文本文件；`npm run build` 通过；`npm run android:apk` 成功产出 APK。发布版本递增到 `versionCode=23`、`versionName=1.0.22`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.22-debug.apk`。APK 复查结果：`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`versionCode=23`、`versionName=1.0.22`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。本次 APK SHA256 为 `B8B94812170F9F504A4DC2DF24AC2753D68C12895FDDC1BD32BAF23340611DCC`。
