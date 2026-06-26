@@ -48,16 +48,18 @@ function App() {
     }
 
     try {
+      if (mode === 'folder') {
+        setNotice('正在扫描文件夹，请稍等。');
+      }
+
       const scanAudioFiles = player.activePlaylistId === AUTO_LOCAL_PLAYLIST_ID ? picker.scanAudioFiles : undefined;
       const result =
         mode === 'folder'
           ? await picker.pickAudioFolder!()
           : await (scanAudioFiles ? scanAudioFiles() : picker.pickAudioFiles());
       const songs = result.songs.map((asset, index) => createSongFromNativeAudio(asset, index));
-      if (result.message) {
-        setNotice(result.message);
-      }
       if (!songs.length) {
+        setNotice(result.message ?? null);
         return;
       }
 

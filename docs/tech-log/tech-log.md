@@ -443,3 +443,15 @@ UI 结构上，`PlaylistSwitcher` 现在同时承担“查看/导入目标歌单
 Android 侧在 `LocalMusicPickerPlugin` 增加 `ACTION_OPEN_DOCUMENT_TREE`，拿到 tree URI 后用 `DocumentsContract.buildChildDocumentsUriUsingTree()` 递归查询子节点，支持 `mp3/flac/wav/m4a/aac/ogg/opus` 等常见扩展和 `audio/*` MIME；扫描上限设为 8000 首，超过后会提示“已导入前 N 首”。文件名保留相对路径，例如子文件夹中的歌会显示为 `子文件夹/歌名`，方便用户知道来源。
 
 验证结果：`npm test -- --run src/App.test.tsx -t "Android folder"` 通过；`npm test -- --run` 6 个测试文件、59 条用例通过；`npm run check:encoding` 通过，扫描 63 个文本文件；`npm run build` 通过；`npm run android:apk` 成功产出 APK。发布版本递增到 `versionCode=23`、`versionName=1.0.22`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.22-debug.apk`。APK 复查结果：`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`versionCode=23`、`versionName=1.0.22`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。本次 APK SHA256 为 `B8B94812170F9F504A4DC2DF24AC2753D68C12895FDDC1BD32BAF23340611DCC`。
+
+# 2026-06-26 技术日志
+
+## v1.0.23：文件夹导入扫描不卡主线程
+
+本轮针对真机反馈“导入文件夹会黑屏几秒”做根因修正。v1.0.22 的功能路径是可用的，但 `pickAudioFolderResult()` 在 Android Activity 回调里直接递归 `DocumentsContract` 查询子目录，并同步组装完整 `JSArray` 后再 resolve 给前端。目录层级深或音频数量多时，这段 I/O 和对象组装会占住界面线程，表现为短暂黑屏或 WebView 假死。
+
+前端先补了可感知状态：用户点“选文件夹”后，在等待原生扫描 Promise 返回期间显示“正在扫描文件夹，请稍等。”；如果用户取消文件夹选择且没有原生提示，提示会自动清空，避免残留。对应 `App.test.tsx` 的文件夹导入用例改为 deferred promise，先验证扫描中提示出现，再 resolve 两首模拟歌曲，最后验证仍然进入当前歌单且不拆分歌单。这个测试先红后绿。
+
+Android 侧把文件夹扫描从回调线程挪到 `ExecutorService` 单线程后台任务里，回调只负责拿到 tree URI、持久化读权限并投递扫描任务。`handleOnDestroy()` 会关闭 executor，跟 Capacitor 内置 HTTP 插件的线程池生命周期保持一致。这样目录递归扫描阶段不再阻塞主界面；仍需注意，扫描结束后一次性把大量歌曲对象传回 WebView 时仍可能有轻微停顿，后续如果真机仍卡，应继续做分批回传/分批入库。
+
+验证结果：文件夹导入测试先红后绿；`npm test -- --run src/App.test.tsx -t "Android folder"` 通过；`npm test -- --run src/App.test.tsx` 22 条通过；`npm test -- --run` 6 个测试文件、59 条用例通过；`npm run check:encoding` 通过，扫描 63 个文本文件；`npm run build` 通过；`npm run android:apk` 成功产出 APK。发布版本递增到 `versionCode=24`、`versionName=1.0.23`，外发包路径为 `C:\AI\Android\jiujiu-personal-player-v1.0.23-debug.apk`。APK 复查结果：`apksigner verify --verbose` 通过，v2 签名为 `true`；`aapt dump badging` 显示包名 `cn.jiujiu.personalplayer`、应用名 `99新自用唱机`、`versionCode=24`、`versionName=1.0.23`、`minSdkVersion=24`、`targetSdkVersion=36`；`zipalign -c -p 4` 通过。本次 APK SHA256 为 `5EE43DA30A200DF5C1A15B621CE18C237C3F803D67B3B922661B3D31B928A7FA`。

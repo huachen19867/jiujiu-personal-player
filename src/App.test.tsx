@@ -239,6 +239,10 @@ describe('App', () => {
   it('imports every Android folder song into the active playlist without splitting playlists', async () => {
     const user = userEvent.setup();
     const pickAudioFiles = vi.fn();
+    let resolveFolderImport!: (value: {
+      songs: Array<{ id: string; name: string; type: string; size: number; uri: string }>;
+      message: string;
+    }) => void;
     const pickAudioFolder = vi.fn().mockResolvedValue({
       songs: [
         {
@@ -258,6 +262,12 @@ describe('App', () => {
       ],
       message: '已从文件夹导入 2 首歌。',
     });
+    pickAudioFolder.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFolderImport = resolve;
+        }),
+    );
     Object.defineProperty(globalThis, 'Capacitor', {
       configurable: true,
       value: {
@@ -275,6 +285,28 @@ describe('App', () => {
 
     expect(pickAudioFolder).toHaveBeenCalledTimes(1);
     expect(pickAudioFiles).not.toHaveBeenCalled();
+    expect(await screen.findByText('正在扫描文件夹，请稍等。')).toBeInTheDocument();
+
+    resolveFolderImport({
+      songs: [
+        {
+          id: 'folder-one',
+          name: '大文件夹/白嫁衣.mp3',
+          type: 'audio/mpeg',
+          size: 4096,
+          uri: 'content://tree/music/白嫁衣',
+        },
+        {
+          id: 'folder-two',
+          name: '大文件夹/子文件夹/青花瓷.mp3',
+          type: 'audio/mpeg',
+          size: 8192,
+          uri: 'content://tree/music/子文件夹/青花瓷',
+        },
+      ],
+      message: '已从文件夹导入 2 首歌。',
+    });
+
     expect(await screen.findByText('已从文件夹导入 2 首歌。')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '歌单一：2 首歌' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '查看 歌单二' })).toBeInTheDocument();

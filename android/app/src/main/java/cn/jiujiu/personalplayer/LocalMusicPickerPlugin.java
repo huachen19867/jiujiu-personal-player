@@ -26,6 +26,8 @@ import com.getcapacitor.annotation.PermissionCallback;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @CapacitorPlugin(
     name = "LocalMusicPicker",
@@ -47,6 +49,7 @@ public class LocalMusicPickerPlugin extends Plugin {
         "audio/flac",
         "audio/ogg"
     };
+    private final ExecutorService folderScanExecutor = Executors.newSingleThreadExecutor();
 
     @PluginMethod
     public void pickAudioFiles(PluginCall call) {
@@ -137,11 +140,9 @@ public class LocalMusicPickerPlugin extends Plugin {
 
     @ActivityCallback
     private void pickAudioFolderResult(PluginCall call, ActivityResult result) {
-        JSArray songs = new JSArray();
-
         if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null || result.getData().getData() == null) {
             JSObject payload = new JSObject();
-            payload.put("songs", songs);
+            payload.put("songs", new JSArray());
             call.resolve(payload);
             return;
         }
@@ -149,7 +150,17 @@ public class LocalMusicPickerPlugin extends Plugin {
         Uri treeUri = result.getData().getData();
         takePersistableTreeReadPermission(treeUri);
 
+        if (folderScanExecutor.isShutdown()) {
+            call.reject("Folder scanner is unavailable");
+            return;
+        }
+
+        folderScanExecutor.submit(() -> resolvePickedAudioFolder(call, treeUri));
+    }
+
+    private void resolvePickedAudioFolder(PluginCall call, Uri treeUri) {
         try {
+            JSArray songs = new JSArray();
             FolderScanState state = new FolderScanState();
             String rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri);
             Uri rootDocumentUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, rootDocumentId);
@@ -163,6 +174,12 @@ public class LocalMusicPickerPlugin extends Plugin {
         } catch (Exception exception) {
             call.reject("Folder import failed", exception);
         }
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        super.handleOnDestroy();
+        folderScanExecutor.shutdownNow();
     }
 
     private void resolveScannedAudioFiles(PluginCall call) {
